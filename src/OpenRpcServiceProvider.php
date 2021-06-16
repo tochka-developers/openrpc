@@ -2,12 +2,12 @@
 
 namespace Tochka\OpenRpc;
 
-use Doctrine\Common\Annotations\AnnotationReader;
-use Doctrine\Common\Annotations\CachedReader;
-use Doctrine\Common\Cache\PhpFileCache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use phpDocumentor\Reflection\DocBlockFactory;
+use Spiral\Attributes\AnnotationReader;
+use Spiral\Attributes\AttributeReader;
+use Spiral\Attributes\Composite\MergeReader;
 use Tochka\OpenRpc\Facades\MethodDescription;
 use Tochka\OpenRpc\Facades\OpenRpc;
 use Tochka\OpenRpc\Pipes\ArrayShapePipe;
@@ -33,11 +33,13 @@ class OpenRpcServiceProvider extends ServiceProvider
         $this->app->singleton(
             MethodDescription::class,
             function () {
-                AnnotationReader::addGlobalIgnoredName('mixin');
-                $reader = new CachedReader(
-                    new AnnotationReader(),
-                    new PhpFileCache($this->app->bootstrapPath('cache/annotations'), '.annotations.php'),
-                    Config::get('app.debug')
+                //AnnotationReader::addGlobalIgnoredName('mixin');
+                
+                $reader = new MergeReader(
+                    [
+                        new AnnotationReader(),
+                        new AttributeReader(),
+                    ]
                 );
                 
                 $docBlockFactory = DocBlockFactory::createInstance();
@@ -54,5 +56,16 @@ class OpenRpcServiceProvider extends ServiceProvider
                 return $instance;
             }
         );
+    }
+    
+    /**
+     * Perform post-registration booting of services.
+     *
+     * @return void
+     */
+    public function boot(): void
+    {
+        // публикуем конфигурации
+        $this->publishes([__DIR__ . '/../config/openrpc.php' => config_path('openrpc.php')], 'openrpc-config');
     }
 }

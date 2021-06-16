@@ -2,17 +2,17 @@
 
 namespace Tochka\OpenRpc\Pipes;
 
-use Doctrine\Common\Annotations\Reader;
-use Tochka\OpenRpc\Annotations\ApiExpectedValues;
+use Spiral\Attributes\ReaderInterface;
+use Tochka\JsonRpc\Annotations\ApiExpectedValues;
 use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
 use Tochka\OpenRpc\DTO\Schema;
 use Tochka\OpenRpc\ExpectedPipeObject;
 
 class ExpectedValuesPipe implements PropertyPipeInterface
 {
-    private Reader $annotationReader;
+    private ReaderInterface $annotationReader;
     
-    public function __construct(Reader $annotationReader)
+    public function __construct(ReaderInterface $annotationReader)
     {
         $this->annotationReader = $annotationReader;
     }
@@ -26,12 +26,12 @@ class ExpectedValuesPipe implements PropertyPipeInterface
         ) {
             /** @var ApiExpectedValues $annotation */
             if ($expected->property !== null) {
-                $annotation = $this->annotationReader->getPropertyAnnotation(
+                $annotation = $this->annotationReader->getPropertyMetadata(
                     $expected->property,
                     ApiExpectedValues::class
                 );
             } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->getMethodAnnotation($expected->method, ApiExpectedValues::class);
+                $annotation = $this->annotationReader->getFunctionMetadata($expected->method, ApiExpectedValues::class);
             } else {
                 $annotation = null;
             }

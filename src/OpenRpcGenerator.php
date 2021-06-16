@@ -4,8 +4,10 @@ namespace Tochka\OpenRpc;
 
 use Illuminate\Support\Facades\Config;
 use Tochka\OpenRpc\DTO\Components;
+use Tochka\OpenRpc\DTO\Contact;
 use Tochka\OpenRpc\DTO\ExternalDocumentation;
 use Tochka\OpenRpc\DTO\Info;
+use Tochka\OpenRpc\DTO\License;
 use Tochka\OpenRpc\DTO\Method;
 use Tochka\OpenRpc\DTO\OpenRpc;
 use Tochka\OpenRpc\DTO\Server;
@@ -51,6 +53,27 @@ class OpenRpcGenerator
         );
         
         set_field_if_not_empty(data_get($this->openRpcConfig, 'description'), $info, 'description');
+        if (!empty($this->openRpcConfig['termsOfService'])) {
+            $info->termsOfService = $this->openRpcConfig['termsOfService'];
+        }
+        if (!empty($this->openRpcConfig['contact'])) {
+            $info->contact = new Contact();
+            if (!empty($this->openRpcConfig['contact']['email'])) {
+                $info->contact->email = $this->openRpcConfig['contact']['email'];
+            }
+            if (!empty($this->openRpcConfig['contact']['name'])) {
+                $info->contact->name = $this->openRpcConfig['contact']['name'];
+            }
+            if (!empty($this->openRpcConfig['contact']['url'])) {
+                $info->contact->url = $this->openRpcConfig['contact']['url'];
+            }
+        }
+        if (!empty($this->openRpcConfig['license']['name'])) {
+            $info->license = new License($this->openRpcConfig['license']['name']);
+            if (!empty($this->openRpcConfig['license']['url'])) {
+                $info->license->url = $this->openRpcConfig['license']['url'];
+            }
+        }
         
         return $info;
     }

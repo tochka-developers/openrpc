@@ -2,17 +2,17 @@
 
 namespace Tochka\OpenRpc\Pipes;
 
-use Doctrine\Common\Annotations\Reader;
-use Tochka\OpenRpc\Annotations\ApiValueExample;
+use Spiral\Attributes\ReaderInterface;
+use Tochka\JsonRpc\Annotations\ApiValueExample;
 use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
 use Tochka\OpenRpc\DTO\Schema;
 use Tochka\OpenRpc\ExpectedPipeObject;
 
 class ValueExamplePipe implements PropertyPipeInterface
 {
-    private Reader $annotationReader;
+    private ReaderInterface $annotationReader;
     
-    public function __construct(Reader $annotationReader)
+    public function __construct(ReaderInterface $annotationReader)
     {
         $this->annotationReader = $annotationReader;
     }
@@ -26,12 +26,12 @@ class ValueExamplePipe implements PropertyPipeInterface
         ) {
             /** @var ApiValueExample $annotation */
             if ($expected->property !== null) {
-                $annotation = $this->annotationReader->getPropertyAnnotation(
+                $annotation = $this->annotationReader->getPropertyMetadata(
                     $expected->property,
                     ApiValueExample::class
                 );
             } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->getMethodAnnotation($expected->method, ApiValueExample::class);
+                $annotation = $this->annotationReader->getFunctionMetadata($expected->method, ApiValueExample::class);
             } else {
                 $annotation = null;
             }

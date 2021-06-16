@@ -19,9 +19,9 @@
         "illuminate/support": "^6.0|^7.0|^8.0",
         "illuminate/container": "^6.0|^7.0|^8.0",
         "illuminate/pipeline": "^6.0|^7.0|^8.0",
-        "doctrine/annotations": "^1.8",
-        "doctrine/cache": "^1.8",
-        "tochka-developers/jsonrpc": "^4.0"
+        "spiral/attributes": "^2.8",
+        "tochka-developers/jsonrpc": "^4.0",
+        "tochka-developers/jsonrpc-annotations": "^1.0.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.5",

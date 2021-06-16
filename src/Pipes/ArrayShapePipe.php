@@ -2,9 +2,9 @@
 
 namespace Tochka\OpenRpc\Pipes;
 
-use Doctrine\Common\Annotations\Reader;
 use phpDocumentor\Reflection\DocBlockFactory;
-use Tochka\OpenRpc\Annotations\ApiArrayShape;
+use Spiral\Attributes\ReaderInterface;
+use Tochka\JsonRpc\Annotations\ApiArrayShape;
 use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
 use Tochka\OpenRpc\DTO\Schema;
 use Tochka\OpenRpc\DTO\SchemaReference;
@@ -14,10 +14,10 @@ use Tochka\OpenRpc\VarType;
 
 class ArrayShapePipe implements PropertyPipeInterface
 {
-    private Reader $annotationReader;
+    private ReaderInterface $annotationReader;
     private DocBlockFactory $docBlockFactory;
     
-    public function __construct(Reader $annotationReader, DocBlockFactory $docBlockFactory)
+    public function __construct(ReaderInterface $annotationReader, DocBlockFactory $docBlockFactory)
     {
         $this->annotationReader = $annotationReader;
         $this->docBlockFactory = $docBlockFactory;
@@ -37,21 +37,21 @@ class ArrayShapePipe implements PropertyPipeInterface
         if ($expected->varType->builtIn) {
             /** @var ApiArrayShape $annotation */
             if ($expected->property !== null) {
-                $annotation = $this->annotationReader->getPropertyAnnotation($expected->property, ApiArrayShape::class);
+                $annotation = $this->annotationReader->getPropertyMetadata($expected->property, ApiArrayShape::class);
             } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->getMethodAnnotation($expected->method, ApiArrayShape::class);
+                $annotation = $this->annotationReader->getFunctionMetadata($expected->method, ApiArrayShape::class);
             }
             
             if ($annotation !== null) {
                 $expected->schema->type = VarType::TYPE_OBJECT;
-                $expected->schema->properties = $this->getPropertiesFromShape($expected, $annotation->shape);
+                $expected->schema->properties = $this->getPropertiesFromShape($annotation->shape);
                 $expected->schema->required = array_keys($annotation->shape);
                 return $expected;
             }
         } elseif ($expected->varType->className !== null) {
             $reflectionClass = new \ReflectionClass($expected->varType->className);
             /** @var ApiArrayShape $annotation */
-            $annotation = $this->annotationReader->getClassAnnotation($reflectionClass, ApiArrayShape::class);
+            $annotation = $this->annotationReader->getClassMetadata($reflectionClass, ApiArrayShape::class);
             
             if ($annotation !== null) {
                 if (!$expected->schemasDictionary->hasSchema($expected->varType->className)) {

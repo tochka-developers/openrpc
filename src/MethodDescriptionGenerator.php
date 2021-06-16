@@ -2,7 +2,6 @@
 
 namespace Tochka\OpenRpc;
 
-use Doctrine\Common\Annotations\Reader;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Pipeline\Pipeline;
@@ -16,11 +15,12 @@ use phpDocumentor\Reflection\Type;
 use phpDocumentor\Reflection\Types\Array_;
 use phpDocumentor\Reflection\Types\Compound;
 use phpDocumentor\Reflection\Types\ContextFactory;
+use Spiral\Attributes\ReaderInterface;
+use Tochka\JsonRpc\Annotations\ApiIgnore;
+use Tochka\JsonRpc\Annotations\ApiIgnoreMethod;
 use Tochka\JsonRpc\Contracts\JsonRpcRequestInterface;
 use Tochka\JsonRpc\Support\JsonRpcHandleResolver;
 use Tochka\JsonRpc\Support\ServerConfig;
-use Tochka\OpenRpc\Annotations\ApiIgnore;
-use Tochka\OpenRpc\Annotations\ApiIgnoreMethod;
 use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
 use Tochka\OpenRpc\Contracts\SchemaReferenceInterface;
 use Tochka\OpenRpc\DTO\Components;
@@ -33,7 +33,7 @@ use Tochka\OpenRpc\DTO\Tag;
 
 class MethodDescriptionGenerator
 {
-    private Reader $annotationReader;
+    private ReaderInterface $annotationReader;
     private DocBlockFactory $docBlockFactory;
     private ControllerFinder $finder;
     
@@ -42,8 +42,11 @@ class MethodDescriptionGenerator
     /** @var array<PropertyPipeInterface> */
     private array $pipes = [];
     
-    public function __construct(Reader $annotationReader, DocBlockFactory $docBlockFactory, ControllerFinder $finder)
-    {
+    public function __construct(
+        ReaderInterface $annotationReader,
+        DocBlockFactory $docBlockFactory,
+        ControllerFinder $finder
+    ) {
         $this->annotationReader = $annotationReader;
         $this->docBlockFactory = $docBlockFactory;
         $this->finder = $finder;
@@ -58,6 +61,7 @@ class MethodDescriptionGenerator
     /**
      * @throws \ReflectionException
      * @throws \JsonException
+     * @throws BindingResolutionException
      */
     public function generate(array $jsonRpcConfig, array $servers): array
     {
@@ -197,11 +201,11 @@ class MethodDescriptionGenerator
             $reflectionProperty->getName(),
             $this->getSchemaForProperty($reflectionProperty, $docBlock, $defaultProperties)
         );
-    
+        
         if (!empty($contentDescriptor->schema->getSchema()->title)) {
             $contentDescriptor->summary = $contentDescriptor->schema->getSchema()->title;
         }
-    
+        
         if (!empty($contentDescriptor->schema->getSchema()->description)) {
             $contentDescriptor->description = $contentDescriptor->schema->getSchema()->description;
         }
@@ -257,7 +261,7 @@ class MethodDescriptionGenerator
                 $requiredProperties[] = $tag->getVariableName();
             }
         }
-    
+        
         set_title_and_description_from_class($schema, $className, $this->docBlockFactory);
         $schema->required = $requiredProperties;
         
@@ -452,7 +456,7 @@ class MethodDescriptionGenerator
     
     /**
      * Возвращает тип переданного параметра
-     * Извелкает его из указанного типа, либо из PHPDoc
+     * Извлекает его из указанного типа, либо из PHPDoc
      *
      * @param \ReflectionType|null $reflectionType
      * @param DocBlock|null $docBlock
@@ -514,7 +518,7 @@ class MethodDescriptionGenerator
     private function getIgnoredMethodsFromController(\ReflectionClass $reflectionClass): array
     {
         $ignoredMethods = [];
-        $classAnnotations = $this->annotationReader->getClassAnnotations($reflectionClass);
+        $classAnnotations = $this->annotationReader->getClassMetadata($reflectionClass);
         
         foreach ($classAnnotations as $classAnnotation) {
             if ($classAnnotation instanceof ApiIgnoreMethod && $classAnnotation->name !== null) {
@@ -535,14 +539,14 @@ class MethodDescriptionGenerator
     private function ignoreThis(\Reflector $reflection): bool
     {
         if ($reflection instanceof \ReflectionClass) {
-            $ignoreAnnotation = $this->annotationReader->getClassAnnotation($reflection, ApiIgnore::class);
+            $ignoreAnnotation = $this->annotationReader->getClassMetadata($reflection, ApiIgnore::class);
             if (!empty($ignoreAnnotation)) {
                 return true;
             }
         }
         
         if ($reflection instanceof \ReflectionMethod) {
-            $ignoreAnnotation = $this->annotationReader->getMethodAnnotation($reflection, ApiIgnore::class);
+            $ignoreAnnotation = $this->annotationReader->getFunctionMetadata($reflection, ApiIgnore::class);
             
             if (!empty($ignoreAnnotation)) {
                 return true;
