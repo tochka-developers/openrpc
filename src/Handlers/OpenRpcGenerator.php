@@ -1,8 +1,9 @@
 <?php
 
-namespace Tochka\OpenRpc;
+namespace Tochka\OpenRpc\Handlers;
 
 use Illuminate\Support\Facades\Config;
+use Tochka\OpenRpc\Contracts\OpenRpcHandlerInterface;
 use Tochka\OpenRpc\DTO\Components;
 use Tochka\OpenRpc\DTO\Contact;
 use Tochka\OpenRpc\DTO\ExternalDocumentation;
@@ -13,7 +14,7 @@ use Tochka\OpenRpc\DTO\OpenRpc;
 use Tochka\OpenRpc\DTO\Server;
 use Tochka\OpenRpc\Facades\MethodDescription;
 
-class OpenRpcGenerator
+class OpenRpcGenerator implements OpenRpcHandlerInterface
 {
     public const OPEN_RPC_VERSION = '1.2.6';
     
