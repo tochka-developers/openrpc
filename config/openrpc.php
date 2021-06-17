@@ -3,6 +3,10 @@
 return [
     /** The title of the application */
     'title' => 'Some JsonRpc',
+    
+    /** Endpoint for OpenRpc schema */
+    'endpoint' => '/api/openrpc.json',
+    
     /**
      * A verbose description of the application. GitHub Flavored Markdown syntax MAY be used for rich text representation
      * You can use a link to a * .md file with a description (relative to the directory resource/)
