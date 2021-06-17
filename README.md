@@ -62,7 +62,7 @@ php artisan openrpc:cache
 После выполнения этой команды будет выполнена сборка схемы и сохранена в файл кеша. При каждом следующем обращении к 
 OpenRpc будет использован именно этот файл, повторной пересборки происходить не будет. 
 
-Если файлы с кешем нет - схема каждый раз будет собираться заново.
+Если файла с кешем нет - схема каждый раз будет собираться заново.
 
 Чтобы очистить кеш - используйте команду artisan:
 ```bash
@@ -87,7 +87,7 @@ use Tochka\JsonRpc\Annotations\ApiArrayShape;
 /**
 * @ApiIgnore()
 */
-class TestObject
+class TestDTO
 {
     /**
     * @ApiValueExample(examples={1, 5, 6})
@@ -108,7 +108,7 @@ use Tochka\JsonRpc\Annotations\ApiValueExample;
 use Tochka\JsonRpc\Annotations\ApiArrayShape;
 
 #[ApiIgnore]
-class TestObject
+class TestDTO
 {
     #[ApiValueExample(examples: [1, 5, 6])]
     public ?int $int;
@@ -287,7 +287,7 @@ OpenRpc забирает информацию о формате ответа и�
 ```php
 use Tochka\JsonRpc\Annotations\ApiArrayShape;
 
-class TestDTO
+class TestController
 {
     #[ApiArrayShape(shape: ['test' => 'string', 'foo' => 'int', 'bar' => 'array', 'object' => FooObject::class])]
     public function someMethod(): array
