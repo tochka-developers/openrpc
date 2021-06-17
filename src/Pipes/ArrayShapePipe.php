@@ -37,9 +37,9 @@ class ArrayShapePipe implements PropertyPipeInterface
         if ($expected->varType->builtIn) {
             /** @var ApiArrayShape $annotation */
             if ($expected->property !== null) {
-                $annotation = $this->annotationReader->getPropertyMetadata($expected->property, ApiArrayShape::class);
+                $annotation = $this->annotationReader->firstPropertyMetadata($expected->property, ApiArrayShape::class);
             } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->getFunctionMetadata($expected->method, ApiArrayShape::class);
+                $annotation = $this->annotationReader->firstFunctionMetadata($expected->method, ApiArrayShape::class);
             }
             
             if ($annotation !== null) {
@@ -51,7 +51,7 @@ class ArrayShapePipe implements PropertyPipeInterface
         } elseif ($expected->varType->className !== null) {
             $reflectionClass = new \ReflectionClass($expected->varType->className);
             /** @var ApiArrayShape $annotation */
-            $annotation = $this->annotationReader->getClassMetadata($reflectionClass, ApiArrayShape::class);
+            $annotation = $this->annotationReader->firstClassMetadata($reflectionClass, ApiArrayShape::class);
             
             if ($annotation !== null) {
                 if (!$expected->schemasDictionary->hasSchema($expected->varType->className)) {

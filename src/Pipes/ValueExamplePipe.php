@@ -26,12 +26,12 @@ class ValueExamplePipe implements PropertyPipeInterface
         ) {
             /** @var ApiValueExample $annotation */
             if ($expected->property !== null) {
-                $annotation = $this->annotationReader->getPropertyMetadata(
+                $annotation = $this->annotationReader->firstPropertyMetadata(
                     $expected->property,
                     ApiValueExample::class
                 );
             } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->getFunctionMetadata($expected->method, ApiValueExample::class);
+                $annotation = $this->annotationReader->firstFunctionMetadata($expected->method, ApiValueExample::class);
             } else {
                 $annotation = null;
             }

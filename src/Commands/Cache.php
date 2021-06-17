@@ -16,7 +16,7 @@ class Cache extends Command
         OpenRpcCache::clear();
         $this->info('OpenRpc cache cleared!');
         
-        OpenRpcCache::set(OpenRpc::handle());
+        OpenRpcCache::save(OpenRpc::handle());
         $this->info('OpenRpc cached successfully!');
     }
 }

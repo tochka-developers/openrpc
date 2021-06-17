@@ -7,7 +7,7 @@ use Tochka\OpenRpc\SchemaCache;
 
 /**
  * @method static array|null get()
- * @method static set(array $schema)
+ * @method static save(array $values)
  * @method static clear()
  * @see SchemaCache
  */

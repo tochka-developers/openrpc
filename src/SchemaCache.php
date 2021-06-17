@@ -23,7 +23,7 @@ class SchemaCache
     
     public function save(array $values): void
     {
-        if (!mkdir($this->cachePath) && !is_dir($this->cachePath)) {
+        if (!is_dir($this->cachePath) && !mkdir($this->cachePath) && !is_dir($this->cachePath)) {
             throw new \RuntimeException(sprintf('Directory "%s" was not created', $this->cachePath));
         }
         
@@ -32,11 +32,14 @@ class SchemaCache
     
     public function clear(): void
     {
-        unlink($this->getCacheFilePath());
+        $filePath = $this->getCacheFilePath();
+        if (file_exists($filePath)) {
+            unlink($filePath);
+        }
     }
     
     private function getCacheFilePath(): string
     {
-        return trim($this->cachePath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'openrpc.php';
+        return rtrim($this->cachePath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'openrpc.php';
     }
 }

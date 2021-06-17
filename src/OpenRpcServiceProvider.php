@@ -88,7 +88,7 @@ class OpenRpcServiceProvider extends ServiceProvider
         
         // add routes
         $routePath = Config::get('openrpc.endpoint', '/api/openrpc.json');
-        Route::put(
+        Route::get(
             $routePath,
             static function () {
                 return OpenRpc::handle();

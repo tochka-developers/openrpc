@@ -26,12 +26,12 @@ class ExpectedValuesPipe implements PropertyPipeInterface
         ) {
             /** @var ApiExpectedValues $annotation */
             if ($expected->property !== null) {
-                $annotation = $this->annotationReader->getPropertyMetadata(
+                $annotation = $this->annotationReader->firstPropertyMetadata(
                     $expected->property,
                     ApiExpectedValues::class
                 );
             } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->getFunctionMetadata($expected->method, ApiExpectedValues::class);
+                $annotation = $this->annotationReader->firstFunctionMetadata($expected->method, ApiExpectedValues::class);
             } else {
                 $annotation = null;
             }

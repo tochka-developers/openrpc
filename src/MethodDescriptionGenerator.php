@@ -539,14 +539,14 @@ class MethodDescriptionGenerator
     private function ignoreThis(\Reflector $reflection): bool
     {
         if ($reflection instanceof \ReflectionClass) {
-            $ignoreAnnotation = $this->annotationReader->getClassMetadata($reflection, ApiIgnore::class);
+            $ignoreAnnotation = $this->annotationReader->firstClassMetadata($reflection, ApiIgnore::class);
             if (!empty($ignoreAnnotation)) {
                 return true;
             }
         }
         
         if ($reflection instanceof \ReflectionMethod) {
-            $ignoreAnnotation = $this->annotationReader->getFunctionMetadata($reflection, ApiIgnore::class);
+            $ignoreAnnotation = $this->annotationReader->firstFunctionMetadata($reflection, ApiIgnore::class);
             
             if (!empty($ignoreAnnotation)) {
                 return true;
