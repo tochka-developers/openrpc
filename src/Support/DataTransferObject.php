@@ -1,6 +1,6 @@
 <?php
 
-namespace Tochka\OpenRpc;
+namespace Tochka\OpenRpc\Support;
 
 use Illuminate\Support\Arr;
 
@@ -8,6 +8,8 @@ class DataTransferObject
 {
     protected array $exceptKeys = [];
     protected array $onlyKeys = [];
+    protected array $nullableKeys = [];
+    protected array $onlyNotEmptyKeys = [];
     
     public function all(): array
     {
@@ -19,7 +21,18 @@ class DataTransferObject
     
         foreach ($properties as $reflectionProperty) {
             // Skip static properties and not initialized properties
-            if ($reflectionProperty->isStatic() || !$reflectionProperty->isInitialized($this)) {
+            if (
+                $reflectionProperty->isStatic()
+                || !$reflectionProperty->isInitialized($this)
+                || (
+                    $reflectionProperty->getValue($this) === null
+                    && !\in_array($reflectionProperty->getName(), $this->nullableKeys, true)
+                )
+                || (
+                    empty($reflectionProperty->getValue($this))
+                    && \in_array($reflectionProperty->getName(), $this->onlyNotEmptyKeys, true)
+                )
+            ) {
                 continue;
             }
         

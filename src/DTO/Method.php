@@ -2,13 +2,18 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Contracts\ContentDescriptorReferenceInterface;
+use Tochka\OpenRpc\Contracts\ErrorReferenceInterface;
+use Tochka\OpenRpc\Contracts\ExamplePairingReferenceInterface;
+use Tochka\OpenRpc\Contracts\LinkReferenceInterface;
+use Tochka\OpenRpc\Contracts\TagReferenceInterface;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
 /**
  * Describes the interface for the given method name. The method name is used as the method field of the JSON-RPC body.
  * It therefore MUST be unique.
  */
-class Method extends DataTransferObject
+final class Method extends DataTransferObject
 {
     /**
      * REQUIRED. The canonical name for the method. The name MUST be unique within the methods array.
@@ -19,9 +24,9 @@ class Method extends DataTransferObject
      * A list of tags for API documentation control. Tags can be used for logical grouping of methods by
      * resources or any other qualifier.
      *
-     * @var array<Tag|Reference>
+     * @var array<TagReferenceInterface>
      */
-    public array $tags;
+    public ?array $tags;
     
     /**
      * A short summary of what the method does.
@@ -45,16 +50,16 @@ class Method extends DataTransferObject
      * parameters that are defined by the Content Descriptor Object. All optional params (content descriptor
      * objects with “required”: false) MUST be positioned after all required params in the list.
      *
-     * @var array<ContentDescriptor|Reference>
+     * @var array<ContentDescriptorReferenceInterface>
      */
     public array $params;
     
     /**
      * REQUIRED. The description of the result returned by the method. It MUST be a Content Descriptor.
      *
-     * @var ContentDescriptor|Reference
+     * @var ContentDescriptorReferenceInterface
      */
-    public $result;
+    public ContentDescriptorReferenceInterface $result;
     
     /**
      * Declares this method to be deprecated. Consumers SHOULD refrain from usage of the declared method.
@@ -72,13 +77,13 @@ class Method extends DataTransferObject
     
     /**
      * A list of custom application defined errors that MAY be returned. The Errors MUST have unique error codes.
-     * @var array<Error|Reference>|null
+     * @var array<ErrorReferenceInterface>|null
      */
     public ?array $errors;
     
     /**
      * A list of possible links from this method call.
-     * @var array<Link|Reference>|null
+     * @var array<LinkReferenceInterface>|null
      */
     public ?array $links;
     
@@ -96,16 +101,16 @@ class Method extends DataTransferObject
     /**
      * Array of Example Pairing Object where each example includes a valid params-to-result Content Descriptor pairing.
      *
-     * @var array<ExamplePairing>|null
+     * @var array<ExamplePairingReferenceInterface>|null
      */
     public ?array $examples;
     
     /**
      * @param string $name
-     * @param array<ContentDescriptor|Reference> $params
-     * @param ContentDescriptor|Reference $result
+     * @param array<ContentDescriptorReferenceInterface> $params
+     * @param ContentDescriptorReferenceInterface $result
      */
-    public function __construct(string $name, array $params, $result)
+    public function __construct(string $name, array $params, ContentDescriptorReferenceInterface $result)
     {
         $this->name = $name;
         $this->params = $params;

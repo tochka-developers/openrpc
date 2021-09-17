@@ -2,45 +2,46 @@
 
 namespace Tochka\OpenRpc\Pipes;
 
-use Spiral\Attributes\ReaderInterface;
 use Tochka\JsonRpc\Annotations\ApiValueExample;
-use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
-use Tochka\OpenRpc\DTO\Schema;
-use Tochka\OpenRpc\ExpectedPipeObject;
+use Tochka\JsonRpc\Facades\JsonRpcDocBlockFactory;
+use Tochka\OpenRpc\Contracts\SchemaHandlerPipeInterface;
+use Tochka\OpenRpc\Support\ClassContext;
+use Tochka\OpenRpc\Support\ExpectedSchemaPipeObject;
+use Tochka\OpenRpc\Support\MethodContext;
 
-class ValueExamplePipe implements PropertyPipeInterface
+class ValueExamplePipe implements SchemaHandlerPipeInterface
 {
-    private ReaderInterface $annotationReader;
-    
-    public function __construct(ReaderInterface $annotationReader)
+    public function handle(ExpectedSchemaPipeObject $expected, callable $next): ExpectedSchemaPipeObject
     {
-        $this->annotationReader = $annotationReader;
-    }
-    
-    public function handle(ExpectedPipeObject $expected, callable $next): ExpectedPipeObject
-    {
-        if (
-            $expected->schema instanceof Schema
-            && $expected->varType !== null
-            && $expected->varType->builtIn
-        ) {
-            /** @var ApiValueExample $annotation */
-            if ($expected->property !== null) {
-                $annotation = $this->annotationReader->firstPropertyMetadata(
-                    $expected->property,
-                    ApiValueExample::class
-                );
-            } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->firstFunctionMetadata($expected->method, ApiValueExample::class);
-            } else {
-                $annotation = null;
-            }
-            
-            if ($annotation !== null) {
-                $expected->schema->examples = $annotation->examples;
-            }
+        /** @var ExpectedSchemaPipeObject $result */
+        $result = $next($expected);
+        
+        $docBlock = null;
+        
+        if ($result->context instanceof MethodContext && $result->isResult) {
+            $docBlock = JsonRpcDocBlockFactory::makeForMethod(
+                $result->context->getClassName(),
+                $result->context->getMethodName()
+            );
         }
         
-        return $next($expected);
+        if ($result->context instanceof ClassContext && !empty($result->parameter->name)) {
+            $docBlock = JsonRpcDocBlockFactory::makeForProperty(
+                $result->context->getClassName(),
+                $result->parameter->name
+            );
+        }
+        
+        if ($docBlock === null) {
+            return $result;
+        }
+        
+        $annotation = $docBlock->firstAnnotation(ApiValueExample::class);
+        
+        if (!empty($annotation)) {
+            $result->schema->getSchema()->examples = $annotation->examples;
+        }
+        
+        return $result;
     }
 }

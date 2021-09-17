@@ -6,5 +6,5 @@ use Tochka\OpenRpc\DTO\Example;
 
 interface ExampleReferenceInterface
 {
-    public function getExample(): ?Example;
+    public function getExample(): Example;
 }

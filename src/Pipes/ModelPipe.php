@@ -2,63 +2,92 @@
 
 namespace Tochka\OpenRpc\Pipes;
 
-use Illuminate\Database\Eloquent\Model;
-use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
+use phpDocumentor\Reflection\DocBlock\Tags\Property;
+use phpDocumentor\Reflection\DocBlock\Tags\PropertyRead;
+use phpDocumentor\Reflection\DocBlock\Tags\PropertyWrite;
+use Tochka\JsonRpc\Facades\JsonRpcDocBlockFactory;
+use Tochka\JsonRpc\Route\Parameters\Parameter;
+use Tochka\JsonRpc\Route\Parameters\ParameterTypeEnum;
+use Tochka\OpenRpc\Contracts\SchemaHandlerPipeInterface;
 use Tochka\OpenRpc\DTO\Schema;
-use Tochka\OpenRpc\ExpectedPipeObject;
 use Tochka\OpenRpc\Facades\MethodDescription;
-use Tochka\OpenRpc\VarType;
+use Tochka\OpenRpc\Support\ExpectedSchemaPipeObject;
 
-class ModelPipe implements PropertyPipeInterface
+class ModelPipe implements SchemaHandlerPipeInterface
 {
-    /**
-     * @throws \ReflectionException
-     */
-    public function handle(ExpectedPipeObject $expected, callable $next): ExpectedPipeObject
+    public function handle(ExpectedSchemaPipeObject $expected, callable $next): ExpectedSchemaPipeObject
     {
+        /** @var ExpectedSchemaPipeObject $result */
         $result = $next($expected);
         
-        $schema = $expected->schema->getSchema();
-        
-        if (
-            !$schema instanceof Schema
-            || $expected->varType === null
-            || $expected->varType->builtIn
-            || !is_subclass_of($expected->varType->className, Model::class)
-        ) {
+        if (!is_subclass_of($result->parameter->className, '\Illuminate\Database\Eloquent\Model')) {
             return $result;
         }
         
-        $reflectionClass = new \ReflectionClass($expected->varType->className);
-        $classPropertyTags = MethodDescription::getPropertyTagsFromDTO($reflectionClass);
-        $defaultProperties = $reflectionClass->getDefaultProperties();
+        $docBlock = JsonRpcDocBlockFactory::makeForClass($result->parameter->className);
+        if ($docBlock === null) {
+            return $result;
+        }
         
-        $properties = [];
-        foreach ($classPropertyTags as $tag) {
+        $schema = $result->schema->getSchema();
+        $schema->type = ParameterTypeEnum::TYPE_OBJECT()->toJsonType();
+        $schema->required = [];
+        $schema->properties = [];
+        
+        /** @var Property[]|PropertyWrite[]|PropertyRead[] $tags */
+        $tags = $docBlock->getTags(null,
+            fn($tag) => $tag instanceof Property
+                || $tag instanceof PropertyRead
+                || $tag instanceof PropertyWrite
+        );
+        
+        $reflector = $docBlock->getReflector();
+        if (!$reflector instanceof \ReflectionClass) {
+            return $result;
+        }
+        
+        $defaultProperties = $reflector->getDefaultProperties();
+        
+        foreach ($tags as $tag) {
             if ($this->isHiddenAttribute($defaultProperties, $tag->getVariableName())) {
                 continue;
             }
-            if (array_key_exists($tag->getVariableName(), $schema->properties)) {
-                $schemaReference = $schema->properties[$tag->getVariableName()];
-                $dateFormat = $this->dateAttribute($defaultProperties, $tag->getVariableName());
-                if ($dateFormat !== null) {
-                    $attributeSchema = new Schema();
-                    $attributeSchema->type = VarType::TYPE_STRING;
-                    $attributeSchema->format = $dateFormat;
-                    $description = $tag->getDescription();
-                    if ($description !== null) {
-                        set_field_if_not_empty($description->getBodyTemplate(), $attributeSchema, 'title');
-                        set_field_if_not_empty($description->getBodyTemplate(), $attributeSchema, 'description');
-                    }
-                    
-                    $properties[$tag->getVariableName()] = $attributeSchema;
-                } else {
-                    $properties[$tag->getVariableName()] = $schemaReference;
-                }
+            
+            if (!in_array($tag->getVariableName(), $schema->required, true)) {
+                $schema->required[] = $tag->getVariableName();
             }
+            $type = ParameterTypeEnum::fromVarType($tag->getType());
+            
+            $parameter = new Parameter($tag->getVariableName(), $type);
+            
+            if ($type->is(ParameterTypeEnum::TYPE_MIXED) && class_exists($tag->getType())) {
+                $parameter->type = ParameterTypeEnum::TYPE_OBJECT();
+                $parameter->className = $tag->getType();
+            }
+            
+            if ($tag->getDescription() !== null) {
+                $parameter->description = $tag->getDescription()->getBodyTemplate();
+            }
+            
+            $dateFormat = $this->dateAttribute($defaultProperties, $tag->getVariableName());
+            if ($dateFormat !== null) {
+                $schemaProperty = new Schema();
+                $schemaProperty->type = ParameterTypeEnum::TYPE_STRING()->toJsonType();
+                $schemaProperty->format = $dateFormat;
+                if ($tag->getDescription() !== null) {
+                    $schemaProperty->title = $tag->getDescription()->getBodyTemplate();
+                    $schemaProperty->description = $tag->getDescription()->getBodyTemplate();
+                }
+            } else {
+                $schemaProperty = MethodDescription::getSchemaWithPipes(
+                    $parameter,
+                    $result->context,
+                    $result->isResult
+                );
+            }
+            
+            $schema->properties[$tag->getVariableName()] = $schemaProperty;
         }
-        
-        $schema->properties = $properties;
         
         return $result;
     }

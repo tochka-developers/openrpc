@@ -17,7 +17,7 @@ return [
     /** The version of the OpenRPC document (which is distinct from the OpenRPC Specification version or the API implementation version) */
     'version' => env('VERSION', '1.0.0'),
     /** A URL to the Terms of Service for the API. MUST be in the format of a URL */
-    'termsOfService' => 'http://terms.com',
+    'termsOfService' => 'https://terms.com/',
     /** The contact information for the exposed API */
     'contact' => [
         /** The email address of the contact person/organization. MUST be in the format of an email address */

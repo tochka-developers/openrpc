@@ -2,13 +2,14 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Contracts\TagReferenceInterface;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
 /**
  * Adds metadata to a single tag that is used by the Method Object. It is not mandatory to have a Tag Object per
  * tag defined in the Method Object instances.
  */
-class Tag extends DataTransferObject
+final class Tag extends DataTransferObject implements TagReferenceInterface
 {
     /**
      * REQUIRED. The name of the tag.
@@ -33,5 +34,10 @@ class Tag extends DataTransferObject
     public function __construct(string $name)
     {
         $this->name = $name;
+    }
+    
+    public function getTag(): Tag
+    {
+        return $this;
     }
 }

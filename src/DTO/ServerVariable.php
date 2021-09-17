@@ -2,12 +2,12 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
 /**
  * An object representing a Server Variable for server URL template substitution.
  */
-class ServerVariable extends DataTransferObject
+final class ServerVariable extends DataTransferObject
 {
     /**
      * An enumeration of string values to be used if the substitution options are from a limited set.

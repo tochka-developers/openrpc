@@ -2,13 +2,13 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
 /**
  * This is the root object of the OpenRPC document. The contents of this object represent a whole OpenRPC
  * document. How this object is constructed or stored is outside the scope of the OpenRPC Specification.
  */
-class OpenRpc extends DataTransferObject
+final class OpenRpc extends DataTransferObject
 {
     /**
      * REQUIRED. This string MUST be the semantic version number of the OpenRPC Specification version that the

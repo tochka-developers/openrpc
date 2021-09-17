@@ -2,87 +2,100 @@
 
 namespace Tochka\OpenRpc\Pipes;
 
-use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
-use Tochka\OpenRpc\DTO\Schema;
-use Tochka\OpenRpc\DTO\SchemaReference;
-use Tochka\OpenRpc\ExpectedPipeObject;
-use Tochka\OpenRpc\VarType;
 use BenSampo\Enum\Enum;
-use phpDocumentor\Reflection\DocBlockFactory;
+use Tochka\JsonRpc\Facades\JsonRpcDocBlockFactory;
+use Tochka\JsonRpc\Route\Parameters\ParameterTypeEnum;
+use Tochka\OpenRpc\Contracts\SchemaHandlerPipeInterface;
+use Tochka\OpenRpc\DTO\Schema;
+use Tochka\OpenRpc\Support\ExpectedSchemaPipeObject;
+use Tochka\OpenRpc\Support\StrSupport;
 
-class EnumPipe implements PropertyPipeInterface
+class EnumPipe implements SchemaHandlerPipeInterface
 {
-    private DocBlockFactory $docBlockFactory;
-    
-    public function __construct(DocBlockFactory $docBlockFactory)
+    public function handle(ExpectedSchemaPipeObject $expected, callable $next): ExpectedSchemaPipeObject
     {
-        $this->docBlockFactory = $docBlockFactory;
-    }
-    
-    /**
-     * @throws \ReflectionException
-     */
-    public function handle(ExpectedPipeObject $expected, callable $next): ExpectedPipeObject
-    {
+        /** @var ExpectedSchemaPipeObject $result */
+        $result = $next($expected);
+        
         if (
-            $expected->schema instanceof Schema
-            && $expected->varType !== null
-            && !$expected->varType->builtIn
-            && is_subclass_of($expected->varType->className, Enum::class)
+            $result->parameter->className !== null
+            && $result->parameter->type->is(ParameterTypeEnum::TYPE_OBJECT)
+            && is_subclass_of($result->parameter->className, Enum::class)
         ) {
-            if (!$expected->schemasDictionary->hasSchema($expected->varType->className)) {
-                $expected->schemasDictionary->addSchema(
-                    $this->getSchemaEnumProperty($expected->schema, $expected->varType->className),
-                    $expected->varType->className
-                );
-            }
-            
-            if ($expected->varType->isArray) {
-                $expected->schema->items = new SchemaReference($expected->varType->className, $expected->schemasDictionary);
-            } else {
-                $expected->schema = new SchemaReference($expected->varType->className, $expected->schemasDictionary);
-            }
-            
-            return $expected;
+            $this->setSchemaEnumProperty($result->schema->getSchema(), $result->parameter->className);
         }
         
-        return $next($expected);
+        return $result;
     }
     
     /**
      * @param Schema $schema
-     * @param class-string $className
-     *
-     * @return Schema
-     * @throws \ReflectionException
+     * @param class-string<Enum> $className
      */
-    private function getSchemaEnumProperty(Schema $schema, string $className): Schema
+    private function setSchemaEnumProperty(Schema $schema, string $className): void
     {
         /** @var Enum $className */
         $schema->enum = $className::getValues();
-    
-        set_title_and_description_from_class($schema, $className, $this->docBlockFactory);
         
+        $classDocBlock = JsonRpcDocBlockFactory::makeForClass($className);
+        if ($classDocBlock !== null) {
+            $schema->title = $classDocBlock->getSummary();
+            $schema->description = StrSupport::resolveRef($classDocBlock->getDescription());
+            
+            $reflector = $classDocBlock->getReflector();
+            if ($reflector instanceof \ReflectionClass) {
+                $valuesDescription = $this->getDescriptionForValues($reflector);
+                $schema->description = implode(PHP_EOL . PHP_EOL, array_filter([$schema->description, $valuesDescription]));
+            }
+        }
+        
+        /** @var ParameterTypeEnum $type */
         $type = array_reduce(
             $schema->enum,
-            function ($carry, $item) {
+            function (?ParameterTypeEnum $carry, $item) {
                 switch (gettype($item)) {
                     case 'string':
-                        return ($carry === null || $carry === VarType::TYPE_STRING) ? VarType::TYPE_STRING : VarType::TYPE_MIXED;
-                    case 'int':
-                        return ($carry === null || $carry === VarType::TYPE_INT) ? VarType::TYPE_INT : VarType::TYPE_MIXED;
-                    case 'float':
-                        return ($carry === null || $carry === VarType::TYPE_FLOAT) ? VarType::TYPE_FLOAT : VarType::TYPE_MIXED;
-                    case 'bool':
-                        return ($carry === null || $carry === VarType::TYPE_BOOL) ? VarType::TYPE_BOOL : VarType::TYPE_MIXED;
+                        return ($carry === null || $carry->is(ParameterTypeEnum::TYPE_STRING()))
+                            ? ParameterTypeEnum::TYPE_STRING()
+                            : ParameterTypeEnum::TYPE_MIXED();
+                    case 'integer':
+                        return ($carry === null || $carry->is(ParameterTypeEnum::TYPE_INTEGER()))
+                            ? ParameterTypeEnum::TYPE_INTEGER()
+                            : ParameterTypeEnum::TYPE_MIXED();
+                    case 'double':
+                        return ($carry === null || $carry->is(ParameterTypeEnum::TYPE_FLOAT()))
+                            ? ParameterTypeEnum::TYPE_FLOAT()
+                            : ParameterTypeEnum::TYPE_MIXED();
+                    case 'boolean':
+                        return ($carry === null || $carry->is(ParameterTypeEnum::TYPE_BOOLEAN()))
+                            ? ParameterTypeEnum::TYPE_BOOLEAN()
+                            : ParameterTypeEnum::TYPE_MIXED();
                     default:
-                        return VarType::TYPE_MIXED;
+                        return ParameterTypeEnum::TYPE_MIXED();
                 }
-            }
+            },
+            null
         );
         
-        $schema->type = VarType::TYPE_SCHEMA_MAP[$type] ?? VarType::TYPE_MIXED;
+        $schema->type = $type->toJsonType();
+    }
+    
+    private function getDescriptionForValues(\ReflectionClass $reflector): ?string
+    {
+        $descriptions = [];
         
-        return $schema;
+        $constants = $reflector->getReflectionConstants();
+        foreach ($constants as $constant) {
+            $docBlock = JsonRpcDocBlockFactory::make($constant);
+            
+            if ($docBlock !== null) {
+                $summary = $docBlock->getSummary();
+                if ($summary !== null) {
+                    $descriptions[] = '**' . $constant->getValue() . '**: ' .  $docBlock->getSummary();
+                }
+            }
+        }
+        
+        return !empty($descriptions) ? 'Значения:' . PHP_EOL . PHP_EOL . implode(PHP_EOL, $descriptions) : null;
     }
 }

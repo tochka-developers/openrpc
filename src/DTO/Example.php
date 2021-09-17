@@ -3,14 +3,14 @@
 namespace Tochka\OpenRpc\DTO;
 
 use Tochka\OpenRpc\Contracts\ExampleReferenceInterface;
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
 /**
  * The Example object is an object the defines an example that is intended to match a given Content Descriptor Schema.
  * If the Content Descriptor Schema includes examples, the value from this Example Object supercedes the value
  * of the schema example.
  */
-class Example extends DataTransferObject implements ExampleReferenceInterface
+final class Example extends DataTransferObject implements ExampleReferenceInterface
 {
     /**
      * Canonical name of the example.
@@ -42,7 +42,7 @@ class Example extends DataTransferObject implements ExampleReferenceInterface
      */
     public ?string $externalValue = null;
     
-    public function getExample(): ?Example
+    public function getExample(): Example
     {
         return $this;
     }

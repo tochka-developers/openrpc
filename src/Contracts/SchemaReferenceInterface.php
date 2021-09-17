@@ -6,5 +6,5 @@ use Tochka\OpenRpc\DTO\Schema;
 
 interface SchemaReferenceInterface
 {
-    public function getSchema(): ?Schema;
+    public function getSchema(): Schema;
 }

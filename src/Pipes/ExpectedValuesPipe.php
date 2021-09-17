@@ -2,45 +2,37 @@
 
 namespace Tochka\OpenRpc\Pipes;
 
-use Spiral\Attributes\ReaderInterface;
 use Tochka\JsonRpc\Annotations\ApiExpectedValues;
-use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
-use Tochka\OpenRpc\DTO\Schema;
-use Tochka\OpenRpc\ExpectedPipeObject;
+use Tochka\JsonRpc\Facades\JsonRpcDocBlockFactory;
+use Tochka\OpenRpc\Contracts\SchemaHandlerPipeInterface;
+use Tochka\OpenRpc\Support\ClassContext;
+use Tochka\OpenRpc\Support\ExpectedSchemaPipeObject;
 
-class ExpectedValuesPipe implements PropertyPipeInterface
+class ExpectedValuesPipe implements SchemaHandlerPipeInterface
 {
-    private ReaderInterface $annotationReader;
-    
-    public function __construct(ReaderInterface $annotationReader)
+    public function handle(ExpectedSchemaPipeObject $expected, callable $next): ExpectedSchemaPipeObject
     {
-        $this->annotationReader = $annotationReader;
-    }
-    
-    public function handle(ExpectedPipeObject $expected, callable $next): ExpectedPipeObject
-    {
+        /** @var ExpectedSchemaPipeObject $result */
+        $result = $next($expected);
+        
         if (
-            $expected->schema instanceof Schema
-            && $expected->varType !== null
-            && $expected->varType->builtIn
+            empty($result->parameter->name)
+            || !$result->context instanceof ClassContext
         ) {
-            /** @var ApiExpectedValues $annotation */
-            if ($expected->property !== null) {
-                $annotation = $this->annotationReader->firstPropertyMetadata(
-                    $expected->property,
-                    ApiExpectedValues::class
-                );
-            } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->firstFunctionMetadata($expected->method, ApiExpectedValues::class);
-            } else {
-                $annotation = null;
-            }
-            
-            if ($annotation !== null) {
-                $expected->schema->enum = $annotation->values;
-            }
+            return $result;
         }
         
-        return $next($expected);
+        $docBlock = JsonRpcDocBlockFactory::makeForProperty($result->context->getClassName(), $result->parameter->name);
+        if ($docBlock === null) {
+            return $result;
+        }
+        
+        $annotation = $docBlock->firstAnnotation(ApiExpectedValues::class);
+        
+        if (!empty($annotation)) {
+            $result->schema->getSchema()->enum = $annotation->values;
+        }
+        
+        return $result;
     }
 }

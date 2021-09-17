@@ -3,7 +3,8 @@
 namespace Tochka\OpenRpc\Commands;
 
 use Illuminate\Console\Command;
-use Tochka\OpenRpc\Facades\OpenRpcCache;
+use Illuminate\Support\Facades\App;
+use Psr\SimpleCache\CacheInterface;
 
 class CacheClear extends Command
 {
@@ -12,8 +13,10 @@ class CacheClear extends Command
     
     public function handle(): void
     {
-        OpenRpcCache::clear();
+        /** @var CacheInterface $cache */
+        $cache = App::make('OpenRpcCache');
     
+        $cache->clear();
         $this->info('OpenRpc cache cleared!');
     }
 }

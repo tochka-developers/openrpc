@@ -3,10 +3,21 @@
 namespace Tochka\OpenRpc\DTO;
 
 use Tochka\OpenRpc\Contracts\SchemaReferenceInterface;
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
-class Schema extends DataTransferObject implements SchemaReferenceInterface
+final class Schema extends DataTransferObject implements SchemaReferenceInterface
 {
+    protected array $nullableKeys = [
+        'default',
+        'const'
+    ];
+    
+    protected array $onlyNotEmptyKeys = [
+        'title',
+        'description',
+        'required'
+    ];
+    
     public ?string $id;
     public ?string $schema;
     public ?string $ref;
@@ -35,7 +46,7 @@ class Schema extends DataTransferObject implements SchemaReferenceInterface
     public int $maxProperties;
     public int $minProperties;
     /** @var array<string> */
-    public array $required;
+    public array $required = [];
     public self $additionalProperties;
     /** @var array<string, mixed> */
     public array $definitions;
@@ -77,7 +88,7 @@ class Schema extends DataTransferObject implements SchemaReferenceInterface
         unset($this->default, $this->const, $this->type);
     }
     
-    public function getSchema(): ?Schema
+    public function getSchema(): Schema
     {
         return $this;
     }

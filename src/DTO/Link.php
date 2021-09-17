@@ -2,7 +2,8 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Contracts\LinkReferenceInterface;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
 /**
  * The Link object represents a possible design-time link for a result. The presence of a link does not guarantee
@@ -15,7 +16,7 @@ use Tochka\OpenRpc\DataTransferObject;
  * For computing links, and providing instructions to execute them, a runtime expression is used for accessing
  * values in an method and using them as parameters while invoking the linked method.
  */
-class Link extends DataTransferObject
+final class Link extends DataTransferObject implements LinkReferenceInterface
 {
     /**
      * REQUIRED. Canonical name of the link.
@@ -56,5 +57,10 @@ class Link extends DataTransferObject
     public function __construct(string $name)
     {
         $this->name = $name;
+    }
+    
+    public function getLink(): Link
+    {
+        return $this;
     }
 }

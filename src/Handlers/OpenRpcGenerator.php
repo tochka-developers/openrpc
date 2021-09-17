@@ -13,6 +13,8 @@ use Tochka\OpenRpc\DTO\Method;
 use Tochka\OpenRpc\DTO\OpenRpc;
 use Tochka\OpenRpc\DTO\Server;
 use Tochka\OpenRpc\Facades\MethodDescription;
+use Tochka\OpenRpc\Support\ReferenceCleaner;
+use Tochka\OpenRpc\Support\StrSupport;
 
 class OpenRpcGenerator implements OpenRpcHandlerInterface
 {
@@ -42,6 +44,8 @@ class OpenRpcGenerator implements OpenRpcHandlerInterface
         $openRpc->servers = $this->getServers();
         $openRpc->methods = $this->getMethods();
         $openRpc->components = $this->getComponents();
+    
+        ReferenceCleaner::clean($openRpc);
         
         return $openRpc->toArray();
     }
@@ -53,27 +57,19 @@ class OpenRpcGenerator implements OpenRpcHandlerInterface
             data_get($this->openRpcConfig, 'version', '1.0.0')
         );
         
-        set_field_if_not_empty(data_get($this->openRpcConfig, 'description'), $info, 'description');
-        if (!empty($this->openRpcConfig['termsOfService'])) {
-            $info->termsOfService = $this->openRpcConfig['termsOfService'];
-        }
+        $info->description = StrSupport::resolveRef(data_get($this->openRpcConfig, 'description'));
+        $info->termsOfService = data_get($this->openRpcConfig, 'termsOfService');
+        
         if (!empty($this->openRpcConfig['contact'])) {
             $info->contact = new Contact();
-            if (!empty($this->openRpcConfig['contact']['email'])) {
-                $info->contact->email = $this->openRpcConfig['contact']['email'];
-            }
-            if (!empty($this->openRpcConfig['contact']['name'])) {
-                $info->contact->name = $this->openRpcConfig['contact']['name'];
-            }
-            if (!empty($this->openRpcConfig['contact']['url'])) {
-                $info->contact->url = $this->openRpcConfig['contact']['url'];
-            }
+            $info->contact->email = data_get($this->openRpcConfig, 'contact.email');
+            $info->contact->name = data_get($this->openRpcConfig, 'contact.name');
+            $info->contact->url = data_get($this->openRpcConfig, 'contact.url');
         }
+        
         if (!empty($this->openRpcConfig['license']['name'])) {
             $info->license = new License($this->openRpcConfig['license']['name']);
-            if (!empty($this->openRpcConfig['license']['url'])) {
-                $info->license->url = $this->openRpcConfig['license']['url'];
-            }
+            $info->license->url = data_get($this->openRpcConfig, 'license.url');
         }
         
         return $info;
@@ -86,10 +82,8 @@ class OpenRpcGenerator implements OpenRpcHandlerInterface
         
         if ($url) {
             $instance = new ExternalDocumentation($url);
-            set_field_if_not_empty(
-                data_get($this->openRpcConfig, 'externalDocumentation.description'),
-                $instance,
-                'description'
+            $instance->description = StrSupport::resolveRef(
+                data_get($this->openRpcConfig, 'externalDocumentation.description')
             );
         }
         
@@ -117,12 +111,8 @@ class OpenRpcGenerator implements OpenRpcHandlerInterface
         foreach ($this->jsonRpcConfig as $name => $server) {
             $url = trim(Config::get('app.url'), '/') . '/' . trim($server['url'] ?? '', '/');
             $openRpcServer = new Server($name, $url);
-            if (isset($server['summary'])) {
-                $openRpcServer->summary = $server['summary'];
-            }
-            if (isset($server['description'])) {
-                set_field_if_not_empty($server['description'], $openRpcServer, 'description');
-            }
+            $openRpcServer->summary = data_get($server, 'summary');
+            $openRpcServer->description = StrSupport::resolveRef(data_get($server, 'description'));
             
             $this->servers[$name] = $openRpcServer;
         }

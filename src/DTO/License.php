@@ -2,12 +2,12 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
 /**
  * License information for the exposed API.
  */
-class License extends DataTransferObject
+final class License extends DataTransferObject
 {
     /**
      * REQUIRED. The license name used for the API.

@@ -2,93 +2,111 @@
 
 namespace Tochka\OpenRpc\Pipes;
 
-use phpDocumentor\Reflection\DocBlockFactory;
-use Spiral\Attributes\ReaderInterface;
 use Tochka\JsonRpc\Annotations\ApiArrayShape;
-use Tochka\OpenRpc\Contracts\PropertyPipeInterface;
+use Tochka\JsonRpc\Facades\JsonRpcDocBlockFactory;
+use Tochka\JsonRpc\Route\Parameters\Parameter;
+use Tochka\JsonRpc\Route\Parameters\ParameterTypeEnum;
+use Tochka\JsonRpc\Support\JsonRpcDocBlock;
+use Tochka\OpenRpc\Contracts\SchemaHandlerPipeInterface;
+use Tochka\OpenRpc\DTO\References\SchemaReference;
 use Tochka\OpenRpc\DTO\Schema;
-use Tochka\OpenRpc\DTO\SchemaReference;
-use Tochka\OpenRpc\ExpectedPipeObject;
 use Tochka\OpenRpc\Facades\MethodDescription;
-use Tochka\OpenRpc\VarType;
+use Tochka\OpenRpc\Support\ClassContext;
+use Tochka\OpenRpc\Support\Context;
+use Tochka\OpenRpc\Support\ExpectedSchemaPipeObject;
+use Tochka\OpenRpc\Support\MethodContext;
+use Tochka\OpenRpc\Support\StrSupport;
+use Tochka\OpenRpc\Support\VirtualContext;
 
-class ArrayShapePipe implements PropertyPipeInterface
+class ArrayShapePipe implements SchemaHandlerPipeInterface
 {
-    private ReaderInterface $annotationReader;
-    private DocBlockFactory $docBlockFactory;
-    
-    public function __construct(ReaderInterface $annotationReader, DocBlockFactory $docBlockFactory)
+    public function handle(ExpectedSchemaPipeObject $expected, callable $next): ExpectedSchemaPipeObject
     {
-        $this->annotationReader = $annotationReader;
-        $this->docBlockFactory = $docBlockFactory;
-    }
+        /** @var ExpectedSchemaPipeObject $result */
+        $result = $next($expected);
+        
+        // если ArrayShape находится в описании результата метода
+        if ($result->context instanceof MethodContext && $result->isResult) {
+            $annotation = $this->getAnnotationFromDocBlock(
+                JsonRpcDocBlockFactory::makeForMethod(
+                    $result->context->getClassName(),
+                    $result->context->getMethodName()
+                )
+            );
+
+            if ($annotation !== null) {
+                $result->schema = $this->getSchema($result, $annotation->shape, new VirtualContext());
     
-    /**
-     * @throws \ReflectionException
-     */
-    public function handle(ExpectedPipeObject $expected, callable $next): ExpectedPipeObject
-    {
-        if (!$expected->schema instanceof Schema) {
-            return $next($expected);
-        }
-        
-        $annotation = null;
-        
-        if ($expected->varType->builtIn) {
-            /** @var ApiArrayShape $annotation */
-            if ($expected->property !== null) {
-                $annotation = $this->annotationReader->firstPropertyMetadata($expected->property, ApiArrayShape::class);
-            } elseif ($expected->method !== null) {
-                $annotation = $this->annotationReader->firstFunctionMetadata($expected->method, ApiArrayShape::class);
-            }
-            
-            if ($annotation !== null) {
-                $expected->schema->type = VarType::TYPE_OBJECT;
-                $expected->schema->properties = $this->getPropertiesFromShape($annotation->shape);
-                $expected->schema->required = array_keys($annotation->shape);
-                return $expected;
-            }
-        } elseif ($expected->varType->className !== null) {
-            $reflectionClass = new \ReflectionClass($expected->varType->className);
-            /** @var ApiArrayShape $annotation */
-            $annotation = $this->annotationReader->firstClassMetadata($reflectionClass, ApiArrayShape::class);
-            
-            if ($annotation !== null) {
-                if (!$expected->schemasDictionary->hasSchema($expected->varType->className)) {
-                    $schema = new Schema();
-                    set_title_and_description_from_class(
-                        $schema,
-                        $expected->varType->className,
-                        $this->docBlockFactory
-                    );
-                    $schema->type = VarType::TYPE_OBJECT;
-                    $schema->properties = $this->getPropertiesFromShape($annotation->shape);
-                    $schema->required = array_keys($annotation->shape);
-                    
-                    $expected->schemasDictionary->addSchema($schema, $expected->varType->className);
-                }
-                
-                $expected->schema = new SchemaReference($expected->varType->className, $expected->schemasDictionary);
-                
-                return $expected;
+                return $result;
             }
         }
         
-        return $next($expected);
+        // если ArrayShape находится в описании свойства класса
+        if ($result->context instanceof ClassContext && !empty($result->parameter->name)) {
+            $annotation = $this->getAnnotationFromDocBlock(
+                JsonRpcDocBlockFactory::makeForProperty($result->context->getClassName(), $result->parameter->name)
+            );
+
+            if ($annotation !== null) {
+                $result->schema = $this->getSchema($result, $annotation->shape, new VirtualContext());
+    
+                return $result;
+            }
+        }
+    
+        // если ArrayShape находится в описании класса
+        if ($result->parameter->className !== null) {
+            $annotation = $this->getAnnotationFromDocBlock(
+                JsonRpcDocBlockFactory::makeForClass($result->parameter->className)
+            );
+
+            if ($annotation !== null) {
+                $result->schema = $result->schemasDictionary->getReference(
+                    StrSupport::fullyQualifiedClassName($result->parameter->className . 'ArrayShape'),
+                    SchemaReference::class,
+                    fn() => $this->getSchema($result, $annotation->shape, new ClassContext($result->parameter->className))
+                );
+            }
+        }
+        
+        return $result;
     }
     
-    private function getPropertiesFromShape(array $shape): array
+    private function getAnnotationFromDocBlock(?JsonRpcDocBlock $docBlock): ?ApiArrayShape
+    {
+        if ($docBlock !== null) {
+            return $docBlock->firstAnnotation(ApiArrayShape::class);
+        }
+        
+        return null;
+    }
+    
+    private function getSchema(ExpectedSchemaPipeObject $expected, array $shape, Context $context): Schema
+    {
+        $schema = new Schema();
+        
+        $schema->type = ParameterTypeEnum::TYPE_OBJECT()->toJsonType();
+        $schema->properties = $this->getPropertiesFromShape($expected, $shape, $context);
+        $schema->required = array_keys($shape);
+        
+        return $schema;
+    }
+    
+    private function getPropertiesFromShape(ExpectedSchemaPipeObject $expected, array $shape, Context $context): array
     {
         $properties = [];
         
         foreach ($shape as $field => $type) {
-            $schema = new Schema();
-            $varType = new VarType($type);
-            $schema->type = $varType->isArray ? VarType::TYPE_ARRAY : $varType->getSchemaType();
+            $typeEnum = ParameterTypeEnum::fromVarType($type);
+            $parameter = new Parameter($field, $typeEnum);
             
-            $childExpected = MethodDescription::sendThroughPipes(null, $schema, $varType);
+            if (class_exists($type) && $typeEnum->is(ParameterTypeEnum::TYPE_MIXED())) {
+                $parameter->className = $type;
+                $parameter->type = ParameterTypeEnum::TYPE_OBJECT();
+                $parameter->required = true;
+            }
             
-            $properties[$field] = $childExpected->schema;
+            $properties[$field] = MethodDescription::getSchemaWithPipes($parameter, $context, $expected->isResult);
         }
         
         return $properties;

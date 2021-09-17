@@ -2,10 +2,11 @@
 
 namespace Tochka\OpenRpc\DTO;
 
+use Tochka\OpenRpc\Contracts\ExamplePairingReferenceInterface;
 use Tochka\OpenRpc\Contracts\ExampleReferenceInterface;
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
-class ExamplePairing extends DataTransferObject
+final class ExamplePairing extends DataTransferObject implements ExamplePairingReferenceInterface
 {
     /**
      * Name for the example pairing.
@@ -33,4 +34,9 @@ class ExamplePairing extends DataTransferObject
      * Example result.
      */
     public ?ExampleReferenceInterface $result;
+    
+    public function getExamplePairing(): ExamplePairing
+    {
+        return $this;
+    }
 }

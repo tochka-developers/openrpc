@@ -2,9 +2,9 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\DataTransferObject;
+use Tochka\OpenRpc\Support\DataTransferObject;
 
-class ExternalDocumentation extends DataTransferObject
+final class ExternalDocumentation extends DataTransferObject
 {
     /**
      * A verbose explanation of the target documentation. GitHub Flavored Markdown syntax MAY be used for rich text
