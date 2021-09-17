@@ -91,11 +91,11 @@ class EnumPipe implements SchemaHandlerPipeInterface
             if ($docBlock !== null) {
                 $summary = $docBlock->getSummary();
                 if ($summary !== null) {
-                    $descriptions[] = '**' . $constant->getValue() . '**: ' .  $docBlock->getSummary();
+                    $descriptions[] = '- **' . $constant->getValue() . '**: ' .  $docBlock->getSummary();
                 }
             }
         }
         
-        return !empty($descriptions) ? 'Значения:' . PHP_EOL . PHP_EOL . implode(PHP_EOL, $descriptions) : null;
+        return !empty($descriptions) ? 'Значения:' . PHP_EOL . PHP_EOL . implode(PHP_EOL . PHP_EOL, $descriptions) : null;
     }
 }
