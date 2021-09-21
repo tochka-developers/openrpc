@@ -109,7 +109,7 @@ class OpenRpcGenerator implements OpenRpcHandlerInterface
     private function getServers(): array
     {
         foreach ($this->jsonRpcConfig as $name => $server) {
-            $url = trim(Config::get('app.url'), '/') . '/' . trim($server['url'] ?? '', '/');
+            $url = trim(Config::get('app.url'), '/') . '/' . trim($server['endpoint'] ?? '', '/');
             $openRpcServer = new Server($name, $url);
             $openRpcServer->summary = data_get($server, 'summary');
             $openRpcServer->description = StrSupport::resolveRef(data_get($server, 'description'));

@@ -44,8 +44,7 @@ class EnumPipe implements SchemaHandlerPipeInterface
             
             $reflector = $classDocBlock->getReflector();
             if ($reflector instanceof \ReflectionClass) {
-                $valuesDescription = $this->getDescriptionForValues($reflector);
-                $schema->description = implode(PHP_EOL . PHP_EOL, array_filter([$schema->description, $valuesDescription]));
+                $schema->oneOf = $this->getConstSchemasForValues($reflector);
             }
         }
         
@@ -80,22 +79,24 @@ class EnumPipe implements SchemaHandlerPipeInterface
         $schema->type = $type->toJsonType();
     }
     
-    private function getDescriptionForValues(\ReflectionClass $reflector): ?string
+    private function getConstSchemasForValues(\ReflectionClass $reflector): array
     {
-        $descriptions = [];
+        $schemas = [];
         
         $constants = $reflector->getReflectionConstants();
         foreach ($constants as $constant) {
             $docBlock = JsonRpcDocBlockFactory::make($constant);
             
+            $schema = new Schema();
+            $schema->const = $constant->getValue();
+            
             if ($docBlock !== null) {
-                $summary = $docBlock->getSummary();
-                if ($summary !== null) {
-                    $descriptions[] = '- **' . $constant->getValue() . '**: ' .  $docBlock->getSummary();
-                }
+                $schema->description = $docBlock->getSummary();
             }
+            
+            $schemas[] = $schema;
         }
         
-        return !empty($descriptions) ? 'Значения:' . PHP_EOL . PHP_EOL . implode(PHP_EOL . PHP_EOL, $descriptions) : null;
+        return $schemas;
     }
 }
