@@ -16,8 +16,10 @@ use Tochka\OpenRpc\Facades\OpenRpc;
 use Tochka\OpenRpc\Handlers\OpenRpcCacheHandler;
 use Tochka\OpenRpc\Handlers\OpenRpcGenerator;
 use Tochka\OpenRpc\Pipes\ArrayShapePipe;
+use Tochka\OpenRpc\Pipes\BackedEnumPipe;
 use Tochka\OpenRpc\Pipes\ClassPropertyFromPhpDocPipe;
-use Tochka\OpenRpc\Pipes\EnumPipe;
+use Tochka\OpenRpc\Pipes\BenSampoEnumPipe;
+use Tochka\OpenRpc\Pipes\DateTimePipe;
 use Tochka\OpenRpc\Pipes\ExpectedValuesPipe;
 use Tochka\OpenRpc\Pipes\ModelPipe;
 use Tochka\OpenRpc\Pipes\ValueExamplePipe;
@@ -51,7 +53,9 @@ class OpenRpcServiceProvider extends ServiceProvider
                 $instance->addPipe(new ExpectedValuesPipe());
                 $instance->addPipe(new ValueExamplePipe());
                 $instance->addPipe(new ArrayShapePipe());
-                $instance->addPipe(new EnumPipe());
+                $instance->addPipe(new DateTimePipe());
+                $instance->addPipe(new BackedEnumPipe());
+                $instance->addPipe(new BenSampoEnumPipe());
                 $instance->addPipe(new ModelPipe());
                 $instance->addPipe(new ClassPropertyFromPhpDocPipe());
     

@@ -10,7 +10,7 @@ use Tochka\OpenRpc\DTO\Schema;
 use Tochka\OpenRpc\Support\ExpectedSchemaPipeObject;
 use Tochka\OpenRpc\Support\StrSupport;
 
-class EnumPipe implements SchemaHandlerPipeInterface
+class BenSampoEnumPipe implements SchemaHandlerPipeInterface
 {
     public function handle(ExpectedSchemaPipeObject $expected, callable $next): ExpectedSchemaPipeObject
     {
