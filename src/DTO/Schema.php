@@ -15,7 +15,8 @@ final class Schema extends DataTransferObject implements SchemaReferenceInterfac
     protected array $onlyNotEmptyKeys = [
         'title',
         'description',
-        'required'
+        'required',
+        'properties',
     ];
     
     public ?string $id;
@@ -51,7 +52,7 @@ final class Schema extends DataTransferObject implements SchemaReferenceInterfac
     /** @var array<string, mixed> */
     public array $definitions;
     /** @var array<string, self> */
-    public array $properties;
+    public array $properties = [];
     /** @var array<string, mixed> */
     public array $patternProperties;
     /** @var array<string, mixed> */
