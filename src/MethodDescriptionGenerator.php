@@ -6,7 +6,6 @@ use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Str;
-use JetBrains\PhpStorm\Deprecated;
 use phpDocumentor\Reflection\DocBlock;
 use Tochka\JsonRpc\Facades\JsonRpcDocBlockFactory;
 use Tochka\JsonRpc\Facades\JsonRpcParamsResolver;
@@ -379,6 +378,12 @@ class MethodDescriptionGenerator
     
     private function openRpcDocBlockIsDeprecated(JsonRpcDocBlock $docBlock): bool
     {
-        return $docBlock->hasTag(DocBlock\Tags\Deprecated::class) || $docBlock->hasAnnotation(Deprecated::class);
+        $hasTag = $docBlock->hasTag(DocBlock\Tags\Deprecated::class);
+
+        if (version_compare(PHP_VERSION, '8.4.0', '>=')) {
+            $hasAnnotation = $docBlock->hasAnnotation(\Deprecated::class);
+        }
+
+        return $hasTag || ($hasAnnotation ?? false);
     }
 }
