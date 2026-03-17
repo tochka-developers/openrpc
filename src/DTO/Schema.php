@@ -2,95 +2,75 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\Contracts\SchemaReferenceInterface;
-use Tochka\OpenRpc\Support\DataTransferObject;
-
-final class Schema extends DataTransferObject implements SchemaReferenceInterface
+final class Schema implements \JsonSerializable
 {
-    protected array $nullableKeys = [
-        'default',
-        'const'
-    ];
-    
-    protected array $onlyNotEmptyKeys = [
-        'title',
-        'description',
-        'required',
-        'properties',
-    ];
-    
-    public ?string $id;
+    // schema description
     public ?string $schema;
     public ?string $ref;
     public ?string $comment;
     public ?string $title;
-    public ?string $description;
-    /** @var mixed */
-    public $default;
-    public ?bool $readOnly;
-    /** @var array */
-    public array $examples;
-    public int $multipleOf;
-    public int $maximum;
-    public int $exclusiveMaximum;
-    public int $minimum;
-    public int $exclusiveMinimum;
-    public int $maxLength;
-    public int $minLength;
-    public string $pattern;
-    public self $additionalItems;
-    public SchemaReferenceInterface $items;
-    public int $maxItems;
-    public int $minItems;
-    public bool $uniqueItems;
-    public self $contains;
-    public int $maxProperties;
-    public int $minProperties;
+    public ?string $summary;
+    public mixed $default;
     /** @var array<string> */
     public array $required = [];
-    public self $additionalProperties;
-    /** @var array<string, mixed> */
-    public array $definitions;
     /** @var array<string, self> */
-    public array $properties = [];
-    /** @var array<string, mixed> */
-    public array $patternProperties;
-    /** @var array<string, mixed> */
-    public array $dependencies;
-    public self $propertyNames;
-    /** @var mixed */
-    public $const;
-    /** @var array */
+    public ?array $properties;
     public array $enum;
-    /** @var array|string */
-    public $type;
-    public string $format;
-    public string $contentMediaType;
-    public string $contentEncoding;
-    public self $if;
-    public self $then;
-    public self $else;
-    /** @var array<self> */
-    public array $allOf;
+    /** @var string[] */
+    public array $type = ['mixed'];
     /** @var array<self> */
     public array $anyOf;
-    /** @var array<self> */
-    public array $oneOf;
-    public self $not;
-
-    public function __construct()
+    public string $format;
+    public self $items;
+    /** @var array<string> */
+    public array $examples;
+    
+    public function jsonSerialize(): object
     {
-        /**
-         * Чтобы при сериализации в массив не выводились эти поля, если не были явно установлены
-         * Так как проверка на вывод поле идет с помощью ReflectionProperty::isInitialized, который
-         * возвращает false для неинициализированных свойств, для которых явно задан тип, и для полей, к которым
-         * применили unset
-         */
-        unset($this->default, $this->const, $this->type);
+        $result = (array)$this;
+        $result['type'] = array_values(array_unique($result['type']));
+        $result['type'] = self::convertType($result['type']);
+        // если больше одно элемента, и там есть mixed, надо его удалить
+        if (count($result['type']) > 1) {
+            $key = array_search('mixed', $result['type']);
+            if ($key !== false) {
+                unset($result['type'][$key]);
+                $result['type'] = array_values($result['type']);
+            }
+        }
+        
+        if (count($result['type']) === 1) {
+            $result['type'] = $result['type'][0];
+        }
+        
+        if ($result['type'] === 'void') {
+            $result['type'] = 'null';
+        }
+        
+        if ($result['type'] === 'mixed') {
+            unset($result['type']);
+        }
+        
+        if (empty($result['required'])) {
+            unset($result['required']);
+        }
+        
+        return (object)$result;
     }
     
-    public function getSchema(): Schema
+    protected static function convertType(array $type): array
     {
-        return $this;
+        $result = [];
+        foreach ($type as $value) {
+            $result[] = match ($value) {
+                'int' => 'integer',
+                'bool' => 'boolean',
+                'float' => 'number',
+                // object/array/string/mixed/null/unknown
+                default => $value,
+            };
+        }
+        
+        return $result;
     }
 }

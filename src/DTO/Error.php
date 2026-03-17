@@ -2,13 +2,10 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\Contracts\ErrorReferenceInterface;
-use Tochka\OpenRpc\Support\DataTransferObject;
-
 /**
  * Defines an application level error.
  */
-final class Error extends DataTransferObject implements ErrorReferenceInterface
+final class Error
 {
     /**
      * REQUIRED. A Number that indicates the error type that occurred. This MUST be an integer. The error codes
@@ -36,10 +33,5 @@ final class Error extends DataTransferObject implements ErrorReferenceInterface
         $this->message = $message;
         
         unset($this->data);
-    }
-    
-    public function getError(): Error
-    {
-        return $this;
     }
 }

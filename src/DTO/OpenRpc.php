@@ -2,13 +2,7 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\Support\DataTransferObject;
-
-/**
- * This is the root object of the OpenRPC document. The contents of this object represent a whole OpenRPC
- * document. How this object is constructed or stored is outside the scope of the OpenRPC Specification.
- */
-final class OpenRpc extends DataTransferObject
+final class OpenRpc
 {
     /**
      * REQUIRED. This string MUST be the semantic version number of the OpenRPC Specification version that the
@@ -35,9 +29,9 @@ final class OpenRpc extends DataTransferObject
      * REQUIRED. The available methods for the API. While it is required, the array may be empty (to handle
      * security filtering, for example).
      *
-     * @var array<Method>
+     * @var array<MethodDescriptor>
      */
-    public array $methods;
+    public array $methods = [];
     
     /**
      * An element to hold various schemas for the specification.
@@ -45,20 +39,13 @@ final class OpenRpc extends DataTransferObject
     public ?Components $components;
     
     /**
-     * Additional external documentation.
-     */
-    public ?ExternalDocumentation $externalDocumentation;
-    
-    /**
      * OpenRpc constructor.
-     * @param string $openrpc
+     * @param string $version
      * @param Info $info
-     * @param array<Method> $methods
      */
-    public function __construct(string $openrpc, Info $info, array $methods)
+    public function __construct(string $version, Info $info)
     {
-        $this->openrpc = $openrpc;
+        $this->openrpc = $version;
         $this->info = $info;
-        $this->methods = $methods;
     }
 }
