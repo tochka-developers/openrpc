@@ -2,7 +2,6 @@
 
 namespace Tochka\OpenRpc\Descriptors\Method\Pipes;
 
-use phpDocumentor\Reflection\DocBlock\Tags\Deprecated;
 use Tochka\OpenRpc\Descriptors\Method\MethodContext;
 use Tochka\OpenRpc\DTO\MethodDescriptor;
 use Tochka\OpenRpc\DTO\Tag;
