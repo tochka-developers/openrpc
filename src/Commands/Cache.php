@@ -3,28 +3,48 @@
 namespace Tochka\OpenRpc\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\App;
-use Psr\SimpleCache\CacheInterface;
+use Illuminate\Support\Facades\Config;
 use Psr\SimpleCache\InvalidArgumentException;
-use Tochka\OpenRpc\Facades\OpenRpc;
+use Tochka\JsonRpc\Router\Router;
+use Tochka\JsonRpc\Support\ServerConfig;
+use Tochka\OpenRpc\OpenRpc;
+use Tochka\OpenRpc\Support\OpenRpcConfig;
 
 class Cache extends Command
 {
-    protected $signature = 'openrpc:cache';
+    protected $signature = 'openrpc:cache {server?}';
     protected $description = 'Make and cache OpenRpc schema';
     
     /**
+     * @throws \ReflectionException
      * @throws InvalidArgumentException
      */
     public function handle(): void
     {
-        /** @var CacheInterface $cache */
-        $cache = App::make('OpenRpcCache');
+        $serverName = $this->argument('server');
+        if ($serverName) {
+            $this->handleOne($serverName);
+        } else {
+            $configs = Config::get('openrpc', []);
+            foreach ($configs as $name => $_) {
+                $this->handleOne($name);
+            }
+        }
+    }
     
-        $cache->clear();
-        $this->info('OpenRpc cache cleared!');
-    
-        $cache->set('schema', OpenRpc::handle());
-        $this->info('OpenRpc cached successfully!');
+    /**
+     * @throws \ReflectionException
+     * @throws InvalidArgumentException
+     */
+    protected function handleOne(string $serverName): void
+    {
+        $openRpc = new OpenRpc(
+            OpenRpcConfig::makeFromConfigFile($serverName),
+            new Router(ServerConfig::makeFromConfigFile($serverName))
+        );
+        $openRpc->cacheClear();
+        $this->info('Server: ' . $serverName . ' OpenRpc cache  cleared!');
+        $openRpc->cacheMake();
+        $this->info('Server: ' . $serverName . ' OpenRpc cached successfully!');
     }
 }

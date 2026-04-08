@@ -2,124 +2,79 @@
 
 namespace Tochka\OpenRpc\Handlers;
 
-use Illuminate\Support\Facades\Config;
+use Illuminate\Pipeline\Pipeline;
+use Illuminate\Support\Facades\App;
+use Psr\SimpleCache\InvalidArgumentException;
+use Tochka\JsonRpc\Router\Route;
+use Tochka\JsonRpc\Router\Router;
 use Tochka\OpenRpc\Contracts\OpenRpcHandlerInterface;
-use Tochka\OpenRpc\DTO\Components;
-use Tochka\OpenRpc\DTO\Contact;
-use Tochka\OpenRpc\DTO\ExternalDocumentation;
-use Tochka\OpenRpc\DTO\Info;
-use Tochka\OpenRpc\DTO\License;
-use Tochka\OpenRpc\DTO\Method;
+use Tochka\OpenRpc\Descriptors\Method\MethodContext;
+use Tochka\OpenRpc\Descriptors\Method\Pipes\PipeInterface;
+use Tochka\OpenRpc\Descriptors\Type\Handlers\HandlerInterface;
+use Tochka\OpenRpc\Descriptors\Type\TypeDescriptor;
 use Tochka\OpenRpc\DTO\OpenRpc;
-use Tochka\OpenRpc\DTO\Server;
-use Tochka\OpenRpc\Facades\MethodDescription;
-use Tochka\OpenRpc\Support\ReferenceCleaner;
-use Tochka\OpenRpc\Support\StrSupport;
+use Tochka\OpenRpc\Support\OpenRpcConfig;
 
 class OpenRpcGenerator implements OpenRpcHandlerInterface
 {
     public const OPEN_RPC_VERSION = '1.2.6';
     
-    private array $openRpcConfig;
-    private array $jsonRpcConfig;
+    private OpenRpcConfig $openRpcConfig;
+    private Router $router;
+    private Pipeline $methodPipeline;
+    private TypeDescriptor $typeDescriptor;
     
-    /** @var array<Server> */
-    private array $servers = [];
-    
-    public function __construct(array $openRpcConfig, array $jsonRpcConfig)
+    public function __construct(OpenRpcConfig $openRpcConfig, Router $router)
     {
         $this->openRpcConfig = $openRpcConfig;
-        $this->jsonRpcConfig = $jsonRpcConfig;
+        $this->router = $router;
+        
+        $this->methodPipeline = App::make(Pipeline::class);
+        foreach ($this->openRpcConfig->methodPipes as $class) {
+            if (!is_subclass_of($class, PipeInterface::class)) {
+                throw new \TypeError($class . ' must implement ' . PipeInterface::class);
+            }
+            $this->methodPipeline->pipe(new $class());
+        }
+        
+        $this->typeDescriptor = new TypeDescriptor();
+        foreach ($this->openRpcConfig->typeDescriptors as $class) {
+            if (!is_subclass_of($class, HandlerInterface::class)) {
+                throw new \TypeError($class . ' must implement ' . HandlerInterface::class);
+            }
+            $this->typeDescriptor->addHandler(new $class());
+        }
     }
     
+    /**
+     * @throws \ReflectionException
+     * @throws InvalidArgumentException
+     */
     public function handle(): array
     {
-        $openRpc = new OpenRpc(self::OPEN_RPC_VERSION, $this->getInfo(), []);
+        $openRpc = new OpenRpc(self::OPEN_RPC_VERSION, $this->openRpcConfig->info);
+        $openRpc->servers[] = $this->openRpcConfig->server;
+        $openRpc = $this->routesDescribe($openRpc, $this->router);
         
-        $externalDocumentation = $this->getExternalDocumentation();
-        if ($externalDocumentation) {
-            $openRpc->externalDocumentation = $externalDocumentation;
-        }
-        
-        $openRpc->servers = $this->getServers();
-        $openRpc->methods = $this->getMethods();
-        $openRpc->components = $this->getComponents();
-    
-        ReferenceCleaner::clean($openRpc);
-        
-        return $openRpc->toArray();
-    }
-    
-    protected function getInfo(): Info
-    {
-        $info = new Info(
-            data_get($this->openRpcConfig, 'title', Config::get('app.name', 'JsonRpc API')),
-            data_get($this->openRpcConfig, 'version', '1.0.0')
-        );
-        
-        $info->description = StrSupport::resolveRef(data_get($this->openRpcConfig, 'description'));
-        $info->termsOfService = data_get($this->openRpcConfig, 'termsOfService');
-        
-        if (!empty($this->openRpcConfig['contact'])) {
-            $info->contact = new Contact();
-            $info->contact->email = data_get($this->openRpcConfig, 'contact.email');
-            $info->contact->name = data_get($this->openRpcConfig, 'contact.name');
-            $info->contact->url = data_get($this->openRpcConfig, 'contact.url');
-        }
-        
-        if (!empty($this->openRpcConfig['license']['name'])) {
-            $info->license = new License($this->openRpcConfig['license']['name']);
-            $info->license->url = data_get($this->openRpcConfig, 'license.url');
-        }
-        
-        return $info;
-    }
-    
-    protected function getExternalDocumentation(): ?ExternalDocumentation
-    {
-        $instance = null;
-        $url = data_get($this->openRpcConfig, 'externalDocumentation.url');
-        
-        if ($url) {
-            $instance = new ExternalDocumentation($url);
-            $instance->description = StrSupport::resolveRef(
-                data_get($this->openRpcConfig, 'externalDocumentation.description')
-            );
-        }
-        
-        return $instance;
+        return (array)$openRpc;
     }
     
     /**
-     * @return array<Method>
+     * @throws \ReflectionException
+     * @throws InvalidArgumentException
      */
-    private function getMethods(): array
+    protected function routesDescribe(OpenRpc $openRpc, Router $router): OpenRpc
     {
-        return MethodDescription::generate($this->jsonRpcConfig, $this->servers);
-    }
-    
-    private function getComponents(): Components
-    {
-        return MethodDescription::getComponents();
-    }
-    
-    /**
-     * @return array<Method>
-     */
-    private function getServers(): array
-    {
-        foreach ($this->jsonRpcConfig as $name => $server) {
-            $url = trim(Config::get('app.url'), '/') . '/' . trim($server['endpoint'] ?? '', '/');
-            $openRpcServer = new Server($name, $url);
-            $openRpcServer->summary = data_get($server, 'summary');
-            $openRpcServer->description = StrSupport::resolveRef(data_get($server, 'description'));
+        /** @var Route $route $route */
+        foreach ($router->getAll() as $route) {
+            $context = new MethodContext($this->methodPipeline, $route, $this->typeDescriptor);
+            $context->describeMethod();
+            $context->describeResult();
+            $context->describeParameters();
             
-            $this->servers[$name] = $openRpcServer;
+            $openRpc->methods[] = $context->getResult();
         }
         
-        return array_values($this->servers);
+        return $openRpc;
     }
 }
-
-
-

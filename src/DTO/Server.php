@@ -2,12 +2,7 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\Support\DataTransferObject;
-
-/**
- * An object representing a Server.
- */
-final class Server extends DataTransferObject
+final class Server
 {
     /**
      * REQUIRED. A name to be used as the canonical name for the server.

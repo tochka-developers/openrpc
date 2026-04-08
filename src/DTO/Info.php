@@ -2,13 +2,11 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\Support\DataTransferObject;
-
 /**
  * The object provides metadata about the API. The metadata MAY be used by the clients if needed, and MAY be
  * presented in editing or documentation generation tools for convenience.
  */
-final class Info extends DataTransferObject
+final class Info
 {
     /**
      * REQUIRED. The title of the application.

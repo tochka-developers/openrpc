@@ -2,26 +2,18 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\Contracts\ContentDescriptorReferenceInterface;
-use Tochka\OpenRpc\Contracts\SchemaReferenceInterface;
-use Tochka\OpenRpc\Support\DataTransferObject;
-
 /**
  * Content Descriptors are objects that do just as they suggest - describe content.
  * They are reusable ways of describing either parameters or result. They MUST have a schema.
  */
-final class ContentDescriptor extends DataTransferObject implements ContentDescriptorReferenceInterface
+class ContentDescriptor
 {
-    protected array $onlyNotEmptyKeys = [
-        'summary',
-        'description',
-    ];
     
     /**
      * REQUIRED. Name of the content that is being described. If the content described is a method parameter
      * assignable by-name, this field SHALL define the parameter’s key (ie name).
      */
-    public string $name;
+    public readonly string $name;
     
     /**
      * A short summary of the content that is being described.
@@ -35,28 +27,23 @@ final class ContentDescriptor extends DataTransferObject implements ContentDescr
     public ?string $description;
     
     /**
-     * Determines if the content is a required field. Default value is false.
+     * Determines if the content is a required field.
      */
     public bool $required;
     
     /**
      * REQUIRED. Schema that describes the content.
      */
-    public SchemaReferenceInterface $schema;
+    public Schema $schema;
     
     /**
      * Specifies that the content is deprecated and SHOULD be transitioned out of usage. Default value is false.
      */
     public bool $deprecated;
     
-    public function __construct(string $name, SchemaReferenceInterface $schema)
+    public function __construct(string $name, Schema $schema)
     {
         $this->name = $name;
         $this->schema = $schema;
-    }
-    
-    public function getContentDescriptor(): ContentDescriptor
-    {
-        return $this;
     }
 }

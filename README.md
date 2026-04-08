@@ -46,77 +46,36 @@ $app->register(\Tochka\OpenRpc\OpenRpcServiceProvider::class);
 $app->withFacades();
 ```
 
-# Настройка точки входа
-Укажите в конфигурации `openrpc.endpoint` точку входа для получения схемы OpenRpc:
+# Настройка маршрута
+
 ```php
-'endpoint' => '/api/openrpc.json'
+Route::get('/api/v1/public/openrpc', function () {
+    $openRpc = new Tochka\OpenRpc\OpenRpc(
+        OpenRpcConfig::makeFromConfigFile('default'),
+        new Router(ServerConfig::makeFromConfigFile('default'))
+    );
+
+    return response($openRpc->handle())->header('Content-Type', 'application/json');
+});
 ```
-В дальнейшем эта точка входа будет использована для Service Discovery Method.
 
 # Кеширование
 OpenRpc может кешировать схему с описанием JsonRpc, чтобы не собирать ее каждый раз при вызове endpoint.
 Для создания кеша используйте команду artisan:
 ```shell
-php artisan openrpc:cache
+php artisan openrpc:cache {server?}
 ```
 После выполнения этой команды будет выполнена сборка схемы и сохранена в файл кеша. При каждом следующем обращении к 
 OpenRpc будет использован именно этот файл, повторной пересборки происходить не будет. 
+Если указать имя сервера, то будет закеширован указанный сервер, иначе будут закешированы все сервера из конфигурации.
 
 Если файла с кешем нет - схема каждый раз будет собираться заново.
 
 Чтобы очистить кеш - используйте команду artisan:
 ```shell
-php artisan openrpc:clear
+php artisan openrpc:clear {server?}
 ```
 Рекомендуется запускать команду кеширования сразу после деплоя перед запуском приложения.
-
-# Как использовать
-
-## Аннотации и атрибуты
-Некоторые пометки или уточнения для классов, методов и полей могут использовать аннотации 
-(https://www.doctrine-project.org/projects/doctrine-annotations/en/1.10/index.html) 
-или атрибуты (https://www.php.net/manual/ru/language.attributes.overview.php).
-Все классы аннотаций/атрибутов обратно совместимы и могут работать и как аннотации (для версии PHP<8), и как атрибуты
-(для версии PHP>=8). 
-Примеры использования аннотаций:
-```php
-use Tochka\JsonRpc\Annotations\ApiIgnore;
-use Tochka\JsonRpc\Annotations\ApiValueExample;
-use Tochka\JsonRpc\Annotations\ApiArrayShape;
-
-/**
-* @ApiIgnore()
-*/
-class TestDTO
-{
-    /**
-    * @ApiValueExample(examples={1, 5, 6})
-    */
-    public ?int $int;
-    
-    /**
-     * @ApiArrayShape(shape={"test": "string", "foo": "int", "bar": "array", "object": FooObject::class})
-     */
-    public array $testShape;
-}
-```
-
-Пример использования атрибутов:
-```php
-use Tochka\JsonRpc\Annotations\ApiIgnore;
-use Tochka\JsonRpc\Annotations\ApiValueExample;
-use Tochka\JsonRpc\Annotations\ApiArrayShape;
-
-#[ApiIgnore]
-class TestDTO
-{
-    #[ApiValueExample(examples: [1, 5, 6])]
-    public ?int $int;
-
-    #[ApiArrayShape(shape: ['test' => 'string', 'foo' => 'int', 'bar' => 'array', 'object' => FooObject::class])]
-    public array $testShape;
-}
-```
 
 ## Расширенное описание
 Во многих объектах спецификации OpenRpc есть поле description, которое позволяет использовать MarkDown разметку.
@@ -151,19 +110,10 @@ JsonRpc-сервера описываются в конфигурации `jsonr
 OpenRpc собирает информацию о доступных методах, получая информацию о 
 [маршрутах из JsonRpc-сервера](https://github.com/tochka-developers/jsonrpc#%D0%BC%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82%D0%B8%D0%B7%D0%B0%D1%86%D0%B8%D1%8F-%D1%80%D0%BE%D1%83%D1%82%D0%B8%D0%BD%D0%B3).
 
-## Информация о формате запроса
-Если в методе используется аннотация/атрибут 
-[`ApiMapRequestToObject`](https://github.com/tochka-developers/jsonrpc#%D0%BC%D0%B0%D0%BF%D0%BF%D0%B8%D0%BD%D0%B3-%D0%BF%D0%B0%D1%80%D0%B0%D0%BC%D0%B5%D1%82%D1%80%D0%BE%D0%B2-%D0%B2-dto-%D0%B8-%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BF%D0%BE%D0%BB%D0%BD%D0%BE%D0%B3%D0%BE-%D0%B7%D0%B0%D0%BF%D1%80%D0%BE%D1%81%D0%B0)
-, то в качестве параметров метода будут указаны поля класса, в который JsonRpc будет маппить запрос.
-
-Если используется стандартное прокидывание параметров запроса в параметры метода - то OpenRpc будет собирать информацию
-об используемых параметрах из этих параметров метода. При этом учитывается типизация, а также дополнительной описание
-параметров с помощью PhpDoc (тег `@param`).
-
 Вы можете уточнять тип вложенных в массив элементов также с помощью тегов `@param` и `@return`:
 ```php
 /**
- * @param array<MyType> $foo Описание параметра FOO
+ * @param array<int, MyType> $foo Описание параметра FOO
  * @param string[] $bar Описание параметра BAR
  * @return Result[]
  */
@@ -174,8 +124,7 @@ public function myMethod(array $foo, array $bar): array
 ```
 Если в качестве типа указан какой-либо класс - OpenRpc попытается описать внутреннюю структуру класса.
 
-По умолчанию выбираются все публичные поля класса. Кроме того, учитываются поля, описанные в phpDoc 
-(помеченные атрибутом `@property`). 
+По умолчанию выбираются все публичные поля класса.
 
 В качестве типа аргумента всегда выбирается тип поля. Поле считается обязательным, если у него нет дефолтного значения.
 
@@ -191,133 +140,23 @@ class TestDTO
 }
 ```
 
-Если в качестве типа указан экземпляр `BenSampo\Enum\Enum` - OpenRpc автоматически получит все варианты значений для поля,
-и попытается вычислить тип. Информация о возможных значениях будет отражена в схеме.
-
 Если в качестве типа указан экземпляр `Illuminate\Database\Eloquent\Model` - OpenRpc получит все возможные поля из phpDoc
 (как указано выше), а затем попытается отфильтровать их в соответствии с правилами, указанными в hidden и visible
 (https://laravel.com/docs/8.x/eloquent-serialization#hiding-attributes-from-json)
-
-Для указания примеров значений для аргумента используйте аннотацию/атрибут `ApiValueExample`:
-```php
-use Tochka\JsonRpc\Annotations\ApiValueExample;
-
-class TestDTO
-{
-    #[ApiValueExample(examples: [1, 3, 5])]
-    public int $field;
-    
-    /**
-     * @ApiValueExample(examples={"foo", "bar"}}
-     */
-    public string $foo;
-}
-```
-
-Для указания вариантов возможных значений (если не используется Enum) - используйте аннотацию/атрибут `ApiExpectedValues`:
-```php
-use Tochka\JsonRpc\Annotations\ApiExpectedValues;
-
-class TestDTO
-{
-    #[ApiExpectedValues(values: [1, 3, 5])]
-    public int $field;
-    
-    /**
-     * @ApiExpectedValues(values={"foo", "bar"}}
-     */
-    public string $foo;
-}
-```
-
-Для указания формата объекта (если для него нет отдельного класса) - используйте аннотацию/атрибут `ApiArrayShape`:
-```php
-use Tochka\JsonRpc\Annotations\ApiArrayShape;
-
-class TestDTO
-{
-    #[ApiArrayShape(shape: ['test' => 'string', 'foo' => 'int', 'bar' => 'array', 'object' => FooObject::class])]
-    public int $field;
-    
-    /**
-     * @ApiArrayShape(shape={"test": "string", "foo": "int", "bar": "array", "object": FooObject::class}}
-     */
-    public string $foo;
-}
-```
-
-Первая строка описания поля в phpDoc считается summary - и отображается в кратком описании аргумента в схеме.
-Вторая и следующие строки описания поля в phpDoc считаются description - и отображаются в полном описании аргумента в 
-схеме. При этом разрешено ссылаться на MarkDown файл:
-```php
-class TestDTO
-{
-    /**
-     * Это будет summary
-     * А вот это будет description
-     */
-    public int $someField;
-    
-    /**
-     * Это будет summary
-     * $views/docs/description.md // содержимое этого файла будет description
-     */
-    public string $foo;
-}
-```
 
 ### Информация об ответе
 OpenRpc забирает информацию о формате ответа из типа, указанного в качестве результата метода. При этом тип может быть 
 указан также в phpDoc этого метода. При этом все возможности OpenRpc, описанные в предыдущем пункте для запросов - будут
 также работать и для описания формата ответа.
 
-Кроме того, дополнительно есть возможность описать формат ответа с помощью атрибута/аннотации `ApiArrayShape`:
-```php
-use Tochka\JsonRpc\Annotations\ApiArrayShape;
 
-class TestController
-{
-    #[ApiArrayShape(shape: ['test' => 'string', 'foo' => 'int', 'bar' => 'array', 'object' => FooObject::class])]
-    public function someMethod(): array
-    {
-        return [];
-    }
-    
-    /**
-     * @ApiArrayShape(shape={"test": "string", "foo": "int", "bar": "array", "object": FooObject::class}}
-     */
-    public function fooMethod(): array
-    {
-        return [];
-    }
-}
-```
-
-Также аннотацию/атрибут `ApiArrayShape` можно использовать для описания структуры класса:
-```php
-use Tochka\JsonRpc\Annotations\ApiArrayShape;
-
-/**
- * @ApiArrayShape(shape={"test": "string", "foo": "int", "bar": "array", "object": FooObject::class})
- */
-class MyResultClass
-{
-    //...
-}
-```
-
-Также эту аннотацию можно использовать для переопределения структуры какого либо свойства класса:
-```php
-use Tochka\JsonRpc\Annotations\ApiArrayShape;
-
-class MyResultClass
-{
-    #[ApiArrayShape(shape: ['test' => 'string', 'foo' => 'int', 'bar' => 'array', 'object' => FooObject::class])]
-    public SomeClass $property;
-}
-```
-### Примеры запросов и ответов
-*В разработке...*
+### Расширение
+*Скоро...*
 
 ### Ошибки
 *В разработке...*
+
+Обновление с v1 до v2
+- v2 Требует версию пакета tochka-developers/jsonrpc v5 и выше
+- обновите конфигурацию на новый формат
+- добавьте маршрут для обработки запроса, как указано выше

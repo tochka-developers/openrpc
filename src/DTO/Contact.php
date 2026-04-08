@@ -2,12 +2,10 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\Support\DataTransferObject;
-
 /**
  * Contact information for the exposed API.
  */
-final class Contact extends DataTransferObject
+final class Contact
 {
     /**
      * The identifying name of the contact person/organization.

@@ -2,25 +2,13 @@
 
 namespace Tochka\OpenRpc\DTO;
 
-use Tochka\OpenRpc\Support\DataTransferObject;
-
 /**
  * Holds a set of reusable objects for different aspects of the OpenRPC. All objects defined within the components
  * object will have no effect on the API unless they are explicitly referenced from properties outside the
  * components object.
  */
-final class Components extends DataTransferObject
+final class Components
 {
-    protected array $onlyNotEmptyKeys = [
-        'contentDescriptors',
-        'schemas',
-        'examples',
-        'links',
-        'errors',
-        'examplePairingObjects',
-        'tags',
-    ];
-    
     /**
      * An object to hold reusable Content Descriptor Objects
      * @var array<string, ContentDescriptor>
@@ -50,12 +38,6 @@ final class Components extends DataTransferObject
      * @var array<string, Error>
      */
     public array $errors = [];
-    
-    /**
-     * An object to hold reusable Example Pairing Objects.
-     * @var array<string, ExamplePairing>
-     */
-    public array $examplePairingObjects = [];
     
     /**
      * An object to hold reusable Tag Objects.
