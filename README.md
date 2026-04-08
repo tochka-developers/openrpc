@@ -2,7 +2,7 @@
 
 # Описание
 Пакет для автоматической генерации документации JsonRpc-сервера по стандарту OpenRpc (https://spec.open-rpc.org/).
-Совместим с пакетом `tochka-developers/jsonrpc`>=v4.0
+Совместим с пакетом `tochka-developers/jsonrpc`>=v5.0
 
 # Установка
 Установка через composer:
@@ -18,32 +18,6 @@ php artisan vendor:publish
 Для того, чтобы опубликовать только конфигурацию данного пакета, можно воспользоваться опцией tag
 ```shell
 php artisan vendor:publish --tag="openrpc-config"
-```
-
-### Lumen
-В Lumen отсутствует команда _vendor:publish_, поэтому делается это вручную.
-Если в проекте еще нет директории для конфигураций - создайте ее:
-```shell
-mkdir config
-```
-Скопируйте в нее конфигурацию openrpc:
-```shell
-cp vendor/tochka-developers/openrpc/config/openrpc.php config/openrpc.php
-```
-Вместо _config/openrpc.php_ нужно указать любую другую директорию, где хранятся ваши конфиги и название будущего конфига.
-Далее необходимо прописать скопированный конфиг в _bootstrap/app.php_
-```php
-$app->configure('openrpc');
-```
-Так же прописать провайдер:
-```php
-$app->register(\Tochka\OpenRpc\OpenRpcServiceProvider::class);
-```
-Где _jsonrpc_ - имя файла конфига
-
-Для корректной работы так же необходимы фасады:
-```php
-$app->withFacades();
 ```
 
 # Настройка маршрута
