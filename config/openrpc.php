@@ -36,6 +36,6 @@ return [
             \Tochka\OpenRpc\Descriptors\Type\Handlers\CollectionHandler::class,
             \Tochka\OpenRpc\Descriptors\Type\Handlers\ObjectHandler::class,
         ],
-        'cache' => \Tochka\JsonRpc\Helpers\ArrayFileCache::class,
+        'cache' => \Tochka\OpenRpc\Cache\FileCache::class,
     ],
 ];
