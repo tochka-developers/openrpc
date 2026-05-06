@@ -19,6 +19,15 @@ use phpDocumentor\Reflection\Type;
 
 class TypeDescriptor
 {
+    public const PRIMITIVE_DOC_TYPES = [
+        Integer::class,
+        Float_::class,
+        Null_::class,
+        Void_::class,
+        String_::class,
+        Boolean::class,
+    ];
+    
     /** @var array<HandlerInterface> */
     protected array $handlers = [];
     /** @var array<int, string> */
@@ -142,25 +151,22 @@ class TypeDescriptor
         if (!$phpDocType) {
             return $schema;
         }
-
-        if (\in_array(
-            $phpDocType::class,
-            [
-                Integer::class,
-                Float_::class,
-                Null_::class,
-                Void_::class,
-                String_::class,
-                Boolean::class,
-            ]
-        )) {
-            $schema->type = [(string) $phpDocType];
-
+        
+        if ($this->allDocTypesIsPrimitive([$phpDocType])) {
+            $schema->type = [(string)$phpDocType];
+            
             return $schema;
         }
         if ($phpDocType instanceof Compound) {
-            foreach ($phpDocType->getIterator() as $type) {
-                $schema->anyOf[] = $this->describeFromPHPDoc($type, new Schema());
+            // if all present type is primitive use array of types, else use anyOf
+            if ($this->allDocTypesIsPrimitive($phpDocType->getIterator()->getArrayCopy())) {
+                foreach ($phpDocType->getIterator() as $localType) {
+                    $schema->type = [...$schema->type, (string)$localType];
+                }
+            } else {
+                foreach ($phpDocType->getIterator() as $type) {
+                    $schema->anyOf[] = $this->describeFromPHPDoc($type, new Schema());
+                }
             }
 
             return $schema;
@@ -198,5 +204,14 @@ class TypeDescriptor
         }
 
         return $schema;
+    }
+    
+    /**
+     * @param array<int, Type> $types
+     * @return bool
+     */
+    protected function allDocTypesIsPrimitive(array $types): bool
+    {
+        return array_all($types, fn($t) => \in_array($t::class, self::PRIMITIVE_DOC_TYPES));
     }
 }
