@@ -42,7 +42,7 @@ class ObjectHandler implements HandlerInterface
             $result = $typeDescriptor->describe($prop->getType(), new Schema(), $phpDocType);
 
             if ($tag) {
-                $result->title = $tag->getDescription();
+                $result->title = $tag->getDescription()?->__toString();
             }
 
             if (!$prop->hasDefaultValue()) {

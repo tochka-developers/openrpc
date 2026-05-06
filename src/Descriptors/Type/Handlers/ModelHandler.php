@@ -43,6 +43,7 @@ class ModelHandler implements HandlerInterface
                 continue;
             }
             $result = $typeDescriptor->describe(null, new Schema(), $property->getType());
+            $result->title = $property->getDescription()?->__toString();
 
             $schema->properties[$property->getVariableName()] = $result;
             if ($property instanceof Property) {
