@@ -11,7 +11,13 @@ class CollectionHandler implements HandlerInterface
 {
     public function shouldHandle(SingularTypeInfo $info): bool
     {
-        return $info->className === '\Illuminate\Support\Collection';
+        return in_array(
+            $info->className,
+            [
+                '\Illuminate\Support\Collection',
+                '\Illuminate\Database\Eloquent\Collection'
+            ]
+        );
     }
     
     public function handle(SingularTypeInfo $info, Schema $schema, TypeDescriptor $typeDescriptor): Schema
