@@ -24,7 +24,7 @@ class CollectionHandler implements HandlerInterface
     {
         if ($info->phpDocType instanceof Generic) {
             $types = $info->phpDocType->getTypes();
-            $valueType = $types[1];
+            $valueType = $types[1] ?? null;
             if ($valueType) {
                 $schema->title = '';
                 $schema->type = ['array'];
