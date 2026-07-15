@@ -24,6 +24,7 @@ final class Schema implements \JsonSerializable
     public self $items;
     /** @var array<string> */
     public array $examples;
+    public array $oneOf;
     
     public function jsonSerialize(): object
     {
