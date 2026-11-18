@@ -34,6 +34,11 @@
             "Tochka\\OpenRpc\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Tochka\\OpenRpc\\Tests\\": "tests/"
+        }
+    },
     "extra": {
         "laravel": {
             "providers": [

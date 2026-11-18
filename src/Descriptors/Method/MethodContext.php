@@ -9,6 +9,7 @@ use phpDocumentor\Reflection\Type;
 use phpDocumentor\Reflection\Types\ContextFactory;
 use Tochka\JsonRpc\Router\PropType;
 use Tochka\JsonRpc\Router\Route;
+use Tochka\OpenRpc\Contracts\ContentDescriptorReferenceInterface;
 use Tochka\OpenRpc\Descriptors\Type\TypeDescriptor;
 use Tochka\OpenRpc\DTO\ContentDescriptor;
 use Tochka\OpenRpc\DTO\MethodDescriptor;
@@ -78,16 +79,47 @@ class MethodContext
             $parameterResult = $this->pipeline->send($this)->thenReturn();
             // if this RequestObject all property of this object is params
             if ($param->propType === PropType::RequestObject) {
-                foreach ($parameterResult->descriptor->schema->properties as $name => $innerProp) {
-                    $contentDescriptor = new ContentDescriptor($name, $innerProp);
+                $requestSchema = $this->typeDescriptor->resolveSchema($parameterResult->descriptor->schema);
+                foreach ($requestSchema->properties ?? [] as $name => $innerProp) {
+                    $contentDescriptor = new ContentDescriptor(
+                        name: $name,
+                        schema: $this->typeDescriptor->getPropertySchema($requestSchema, $name),
+                    );
                     $contentDescriptor->summary = $innerProp->summary ?? '';
-                    $this->result->params[] = $contentDescriptor;
+                    if (isset($innerProp->description)) {
+                        $contentDescriptor->description = $innerProp->description;
+                    }
+                    $contentDescriptor->required = in_array($name, $requestSchema->required, true);
+                    $this->result->params[] = $this->typeDescriptor->referenceParameter(
+                        requestSchema: $requestSchema,
+                        descriptor: $contentDescriptor,
+                    );
                 }
+                $this->result->paramStructure = 'by-name';
+                $this->sortRequestParameters();
                 break;
+            }
+
+            $this->result->params[] = $parameterResult->descriptor;
+        }
+    }
+
+    protected function sortRequestParameters(): void
+    {
+        $required = [];
+        $optional = [];
+        foreach ($this->result->params as $parameter) {
+            $descriptor = $parameter instanceof ContentDescriptorReferenceInterface
+                ? $parameter->getContentDescriptor()
+                : $parameter;
+            if ($descriptor->required) {
+                $required[] = $parameter;
             } else {
-                $this->result->params[] = $parameterResult->descriptor;
+                $optional[] = $parameter;
             }
         }
+
+        $this->result->params = [...$required, ...$optional];
     }
     
     public function describeType(?\ReflectionType $type, Schema $schema, ?Type $phpDocType = null): Schema
