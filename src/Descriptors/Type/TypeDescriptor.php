@@ -3,6 +3,7 @@
 namespace Tochka\OpenRpc\Descriptors\Type;
 
 use phpDocumentor\Reflection\PseudoTypes\Generic;
+use phpDocumentor\Reflection\Type;
 use phpDocumentor\Reflection\Types\Array_;
 use phpDocumentor\Reflection\Types\Boolean;
 use phpDocumentor\Reflection\Types\Compound;
@@ -14,8 +15,9 @@ use phpDocumentor\Reflection\Types\Object_;
 use phpDocumentor\Reflection\Types\String_;
 use phpDocumentor\Reflection\Types\Void_;
 use Tochka\OpenRpc\Descriptors\Type\Handlers\HandlerInterface;
+use Tochka\OpenRpc\DTO\ContentDescriptor;
+use Tochka\OpenRpc\DTO\ContentDescriptorReference;
 use Tochka\OpenRpc\DTO\Schema;
-use phpDocumentor\Reflection\Type;
 
 class TypeDescriptor
 {
@@ -30,8 +32,84 @@ class TypeDescriptor
     
     /** @var array<HandlerInterface> */
     protected array $handlers = [];
-    /** @var array<int, string> */
-    protected array $classStack = [];
+    /** @var array<string, Schema> */
+    protected array $schemas = [];
+    /** @var array<string, ContentDescriptor> */
+    protected array $contentDescriptors = [];
+
+    public function describeProperty(\ReflectionProperty $property, ?Type $phpDocType): Schema
+    {
+        return $this->describe($property->getType(), new Schema(), $phpDocType);
+    }
+
+    public function reset(): void
+    {
+        $this->schemas = [];
+        $this->contentDescriptors = [];
+    }
+
+    /**
+     * @return array<string, Schema>
+     */
+    public function getSchemas(): array
+    {
+        return $this->schemas;
+    }
+
+    /**
+     * @return array<string, ContentDescriptor>
+     */
+    public function getContentDescriptors(): array
+    {
+        return $this->contentDescriptors;
+    }
+
+    public function referenceParameter(Schema $requestSchema, ContentDescriptor $descriptor): ContentDescriptor|ContentDescriptorReference
+    {
+        $schemaKey = array_search($requestSchema, $this->schemas, true);
+        if ($schemaKey === false) {
+            return $descriptor;
+        }
+
+        $key = $schemaKey . '.' . $descriptor->name;
+        $this->contentDescriptors[$key] ??= $descriptor;
+
+        return new ContentDescriptorReference(
+            '#/components/contentDescriptors/' . str_replace(['~', '/'], ['~0', '~1'], $key),
+            $this->contentDescriptors[$key],
+        );
+    }
+
+    public function getPropertySchema(Schema $schema, string $propertyName): Schema
+    {
+        $key = array_search($schema, $this->schemas, true);
+        if ($key === false) {
+            return $schema->properties[$propertyName];
+        }
+
+        $reference = new Schema();
+        $reference->ref = '#/components/schemas/'
+            . str_replace(['~', '/'], ['~0', '~1'], $key)
+            . '/properties/' . str_replace(['~', '/'], ['~0', '~1'], $propertyName);
+
+        return $reference;
+    }
+
+    public function resolveSchema(Schema $schema): Schema
+    {
+        if (isset($schema->ref)) {
+            $key = str_replace(['~1', '~0'], ['/', '~'], substr($schema->ref, strlen('#/components/schemas/')));
+            return $this->schemas[$key];
+        }
+        foreach ($schema->anyOf ?? [] as $branch) {
+            $resolved = $this->resolveSchema($branch);
+            if (isset($resolved->properties)) {
+                return $resolved;
+            }
+        }
+
+        return $schema;
+    }
 
     public function __construct(?HandlerInterface ...$handlers)
     {
@@ -48,9 +126,7 @@ class TypeDescriptor
     public function describe(?\ReflectionType $type, Schema $schema, ?Type $phpDocType = null): Schema
     {
         if ($phpDocType) {
-            $this->describeFromPHPDoc($phpDocType, $schema);
-
-            return $schema;
+            return $this->describeFromPHPDoc($phpDocType, $schema);
         }
 
         if ($type instanceof \ReflectionIntersectionType) {
@@ -63,7 +139,9 @@ class TypeDescriptor
             }
 
             if ($type->getName() === 'array') {
-                return $this->describeFromPHPDoc($phpDocType, $schema);
+                $schema->type = $type->allowsNull() ? ['array', 'null'] : ['array'];
+
+                return $schema;
             }
 
             if ($type->isBuiltin()) {
@@ -101,8 +179,8 @@ class TypeDescriptor
                     $schema->type = [...$schema->type, 'null'];
                 }
             } else {
-                foreach ($type->getTypes() as $type) {
-                    return $this->describe($type, $schema);
+                foreach ($type->getTypes() as $reflectionType) {
+                    $schema->anyOf[] = $this->describe($reflectionType, new Schema());
                 }
             }
         }
@@ -123,27 +201,38 @@ class TypeDescriptor
 
     protected function handleClassByName(SingularTypeInfo $info, Schema $schema): Schema
     {
-        $schema->title = $info->className;
-        if (\in_array($info->className, $this->classStack, true)) {
-            $schema->type = ['object'];
-
+        $className = ltrim($info->className ?? '', '\\');
+        $reflection = class_exists($className) ? new \ReflectionClass($className) : null;
+        $className = $reflection?->getName() ?? $className;
+        $key = str_replace('\\', '.', $className);
+        if ($info->phpDocType instanceof Generic) {
+            $key .= '.' . hash('sha256', (string)$info->phpDocType);
+        }
+        $schema->ref = '#/components/schemas/' . str_replace(['~', '/'], ['~0', '~1'], $key);
+        if (isset($this->schemas[$key])) {
             return $schema;
         }
 
-        $this->classStack[] = $info->className;
-
-        foreach ($this->handlers as $handler) {
-            if ($handler->shouldHandle($info)) {
-                $schema->type = ['object'];
-
-                $result = $handler->handle($info, $schema, $this);
-                array_pop($this->classStack);
-
-                return $result;
+        $savedSchemas = $this->schemas;
+        $definition = new Schema();
+        $definition->title = $className;
+        $this->schemas[$key] = $definition;
+        try {
+            foreach ($this->handlers as $handler) {
+                if ($handler->shouldHandle($info)) {
+                    $definition->type = ['object'];
+                    $definition = $handler->handle($info, $definition, $this);
+                    break;
+                }
             }
-        }
+            $this->schemas[$key] = $definition;
 
-        return $schema;
+            return $schema;
+        } catch (\Throwable $exception) {
+            $this->schemas = $savedSchemas;
+
+            throw $exception;
+        }
     }
 
     public function describeFromPHPDoc(?Type $phpDocType, Schema $schema): Schema
@@ -173,9 +262,10 @@ class TypeDescriptor
         }
 
         if ($phpDocType instanceof Nullable) {
-            $schema->type = [...$schema->type, 'null'];
-
-            return $this->describeFromPHPDoc($phpDocType->getActualType(), $schema);
+            $nullSchema = new Schema();
+            $nullSchema->type = ['null'];
+            $schema->anyOf = [$this->describeFromPHPDoc($phpDocType->getActualType(), new Schema()), $nullSchema];
+            return $schema;
         }
 
         if ($phpDocType instanceof Generic) {

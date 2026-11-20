@@ -7,7 +7,7 @@ namespace Tochka\OpenRpc\DTO;
  * object will have no effect on the API unless they are explicitly referenced from properties outside the
  * components object.
  */
-final class Components
+final class Components implements \JsonSerializable
 {
     /**
      * An object to hold reusable Content Descriptor Objects
@@ -44,4 +44,16 @@ final class Components
      * @var array<string, Tag>
      */
     public array $tags = [];
+
+    public function jsonSerialize(): object
+    {
+        $result = [];
+        foreach (get_object_vars($this) as $name => $components) {
+            if ($components !== []) {
+                $result[$name] = (object)$components;
+            }
+        }
+
+        return (object)$result;
+    }
 }

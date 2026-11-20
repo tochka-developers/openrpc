@@ -38,7 +38,7 @@ final class MethodDescriptor
      * parameters that are defined by the Content Descriptor Object. All optional params (content descriptor
      * objects with “required”: false) MUST be positioned after all required params in the list.
      *
-     * @var array<ContentDescriptor>
+     * @var array<ContentDescriptor|ContentDescriptorReference>
      */
     public array $params = [];
     
