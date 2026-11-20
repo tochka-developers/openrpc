@@ -70,6 +70,12 @@ class ObjectHandler implements HandlerInterface
                     }
                 }
             }
+            if ($isOptional && !$hasDefault) {
+                throw new \RuntimeException(
+                    'Свойство ' . $prop->getDeclaringClass()->getName() . '::$' . $prop->getName()
+                    . ' с #[Optional] должно иметь значение по умолчанию.'
+                );
+            }
             if ($hasDefault && (!$isOptional || $default !== null)) {
                 $result->default = $default;
             } elseif (!$hasDefault && !$isOptional) {

@@ -14,7 +14,6 @@ use phpDocumentor\Reflection\Types\Nullable;
 use phpDocumentor\Reflection\Types\Object_;
 use phpDocumentor\Reflection\Types\String_;
 use phpDocumentor\Reflection\Types\Void_;
-use Tochka\OpenRpc\Attributes\SchemaReference;
 use Tochka\OpenRpc\Descriptors\Type\Handlers\HandlerInterface;
 use Tochka\OpenRpc\DTO\ContentDescriptor;
 use Tochka\OpenRpc\DTO\ContentDescriptorReference;
@@ -33,31 +32,20 @@ class TypeDescriptor
     
     /** @var array<HandlerInterface> */
     protected array $handlers = [];
-    /** @var array<int, string> */
-    protected array $classStack = [];
     /** @var array<string, Schema> */
     protected array $schemas = [];
     /** @var array<string, ContentDescriptor> */
     protected array $contentDescriptors = [];
-    /** @var list<string> */
-    protected array $propertyPath = [];
 
     public function describeProperty(\ReflectionProperty $property, ?Type $phpDocType): Schema
     {
-        $this->propertyPath[] = $property->getDeclaringClass()->getName() . '::$' . $property->getName();
-        try {
-            return $this->describe($property->getType(), new Schema(), $phpDocType);
-        } finally {
-            array_pop($this->propertyPath);
-        }
+        return $this->describe($property->getType(), new Schema(), $phpDocType);
     }
 
     public function reset(): void
     {
         $this->schemas = [];
         $this->contentDescriptors = [];
-        $this->classStack = [];
-        $this->propertyPath = [];
     }
 
     /**
@@ -216,35 +204,19 @@ class TypeDescriptor
         $className = ltrim($info->className ?? '', '\\');
         $reflection = class_exists($className) ? new \ReflectionClass($className) : null;
         $className = $reflection?->getName() ?? $className;
-        $reference = $reflection !== null && $reflection->getAttributes(SchemaReference::class) !== [];
         $key = str_replace('\\', '.', $className);
-        $stackIdentity = $className;
         if ($info->phpDocType instanceof Generic) {
             $key .= '.' . hash('sha256', (string)$info->phpDocType);
-            $stackIdentity .= '<' . implode(', ', $info->phpDocType->getTypes()) . '>';
         }
-        $savedStack = $this->classStack;
+        $schema->ref = '#/components/schemas/' . str_replace(['~', '/'], ['~0', '~1'], $key);
+        if (isset($this->schemas[$key])) {
+            return $schema;
+        }
+
         $savedSchemas = $this->schemas;
-        if ($reference) {
-            $schema->ref = '#/components/schemas/' . str_replace(['~', '/'], ['~0', '~1'], $key);
-            if (isset($this->schemas[$key])) {
-                return $schema;
-            }
-            $definition = new Schema();
-            $this->schemas[$key] = $definition;
-            $this->classStack = [];
-        } else {
-            if (in_array($stackIdentity, $this->classStack, true)) {
-                throw new \RuntimeException(
-                    'Цикл inline-схем: ' . implode(' -> ', [...$this->classStack, $stackIdentity])
-                    . '; свойства: ' . implode(' -> ', $this->propertyPath)
-                    . '. Добавьте #[SchemaReference] к DTO цикла.'
-                );
-            }
-            $definition = $schema;
-        }
-        $this->classStack[] = $stackIdentity;
+        $definition = new Schema();
         $definition->title = $className;
+        $this->schemas[$key] = $definition;
         try {
             foreach ($this->handlers as $handler) {
                 if ($handler->shouldHandle($info)) {
@@ -253,17 +225,13 @@ class TypeDescriptor
                     break;
                 }
             }
-            if ($reference) {
-                $this->schemas[$key] = $definition;
-                return $schema;
-            }
-            return $definition;
+            $this->schemas[$key] = $definition;
+
+            return $schema;
         } catch (\Throwable $exception) {
             $this->schemas = $savedSchemas;
-            
+
             throw $exception;
-        } finally {
-            $this->classStack = $savedStack;
         }
     }
 

@@ -38,16 +38,18 @@ final class TypeDescriptorTest extends TestCase
     {
         $schema = $this->descriptor->describeFromPHPDoc(new Object_(new Fqsen('\\' . $class)), new Schema());
 
-        return json_decode(json_encode($schema, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('#/components/schemas/' . str_replace('\\', '.', $class), $schema->ref);
+
+        return json_decode(json_encode($this->descriptor->resolveSchema($schema), JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
     }
 
-    /** Unmarked objects expand fully, including repeated and nullable properties. */
-    public function testInlineObjects(): void
+    /** Objects reuse definitions, including repeated and nullable properties. */
+    public function testObjectReferences(): void
     {
         $schema = $this->describe(PlainRequest::class);
-        self::assertSame('integer', $schema['properties']['data']['anyOf'][0]['properties']['value']['type']);
+        self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.PlainData', $schema['properties']['data']['anyOf'][0]['$ref']);
         self::assertSame($schema['properties']['first'], $schema['properties']['second']);
-        self::assertSame([], $this->descriptor->getSchemas());
+        self::assertCount(2, $this->descriptor->getSchemas());
     }
 
     /** Imports resolve to one reusable definition without leaking property annotations. */
@@ -61,7 +63,7 @@ final class TypeDescriptorTest extends TestCase
         self::assertSame(['second'], $schema['properties']['second']['examples']);
         self::assertSame('Data description.', $schema['properties']['data']['description']);
         self::assertArrayNotHasKey('ignored', $schema['properties']);
-        self::assertCount(1, $this->descriptor->getSchemas());
+        self::assertCount(2, $this->descriptor->getSchemas());
         $definition = json_decode(json_encode($this->descriptor->getSchemas()['Tochka.OpenRpc.Tests.Fixtures.SharedData']), true);
         self::assertArrayNotHasKey('examples', $definition);
         self::assertSame([null, true, false, 0, [30, 45]], $definition['properties']['agree']['examples']);
@@ -74,25 +76,26 @@ final class TypeDescriptorTest extends TestCase
         foreach ([MixedA::class, MixedB::class, ReferenceCycle::class] as $class) {
             $this->descriptor->reset();
             $this->describe($class);
-            self::assertCount(1, $this->descriptor->getSchemas());
+            self::assertCount($class === ReferenceCycle::class ? 1 : 2, $this->descriptor->getSchemas());
             self::assertNotFalse(json_encode($this->descriptor->getSchemas(), JSON_THROW_ON_ERROR));
         }
     }
 
-    /** Inline cycles fail explicitly and roll back incomplete components. */
-    public function testInlineCyclesAndRecovery(): void
+    /** Cycles without attributes terminate through registered references. */
+    public function testCyclesWithoutAttributes(): void
     {
         foreach ([InlineCycle::class, InlineA::class, BrokenReference::class] as $class) {
-            try {
-                $this->describe($class);
-                self::fail('Expected inline cycle exception.');
-            } catch (\RuntimeException $exception) {
-                self::assertStringContainsString('SchemaReference', $exception->getMessage());
-                self::assertStringContainsString('::$', $exception->getMessage());
-                self::assertStringContainsString('Tests\\Fixtures\\Inline', $exception->getMessage());
+            $this->descriptor->reset();
+            $schema = $this->describe($class);
+            self::assertSame('object', $schema['type']);
+            self::assertCount($class === InlineCycle::class ? 1 : 2, $this->descriptor->getSchemas());
+            if ($class === InlineCycle::class) {
+                self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.InlineCycle', $schema['properties']['child']['anyOf'][1]['$ref']);
+            } elseif ($class === InlineA::class) {
+                self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.InlineB', $schema['properties']['children']['items']['$ref']);
+                $child = $this->descriptor->getSchemas()['Tochka.OpenRpc.Tests.Fixtures.InlineB'];
+                self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.InlineA', $child->properties['parent']->ref);
             }
-            self::assertSame([], $this->descriptor->getSchemas());
-            self::assertSame('object', $this->describe(PlainRequest::class)['type']);
         }
     }
 
@@ -106,7 +109,7 @@ final class TypeDescriptorTest extends TestCase
         self::assertSame([], $schema['properties']['emptyExamples']['examples']);
     }
 
-    /** Full class keys avoid collisions and class attributes are not inherited. */
+    /** Full class keys avoid collisions and inherited DTOs have their own definitions. */
     public function testKeysInheritanceAndReset(): void
     {
         $this->describe(SharedData::class);
@@ -115,10 +118,10 @@ final class TypeDescriptorTest extends TestCase
         $this->descriptor->reset();
         $schema = $this->describe(ChildRequest::class);
         self::assertArrayNotHasKey('$ref', $schema);
-        self::assertSame(['Tochka.OpenRpc.Tests.Fixtures.SharedData'], array_keys($this->descriptor->getSchemas()));
+        self::assertSame(['Tochka.OpenRpc.Tests.Fixtures.ChildRequest', 'Tochka.OpenRpc.Tests.Fixtures.SharedData'], array_keys($this->descriptor->getSchemas()));
     }
 
-    /** Missing handlers do not poison the active class stack. */
+    /** Missing handlers still reuse a stable registered definition. */
     public function testMissingHandlerCleanup(): void
     {
         $this->descriptor = new TypeDescriptor();
@@ -131,8 +134,8 @@ final class TypeDescriptorTest extends TestCase
         $this->describe(SharedData::class);
         $before = json_encode($this->descriptor->getSchemas(), JSON_THROW_ON_ERROR);
         try {
-            $this->describe(BrokenReference::class);
-            self::fail('Expected inline cycle exception.');
+            $this->describe(Fixtures\NullOnlyOptionalDto::class);
+            self::fail('Expected invalid Optional exception.');
         } catch (\RuntimeException) {
             self::assertSame($before, json_encode($this->descriptor->getSchemas(), JSON_THROW_ON_ERROR));
         }
@@ -143,7 +146,7 @@ final class TypeDescriptorTest extends TestCase
     {
         $handler = $this->createMock(\Tochka\OpenRpc\Descriptors\Type\Handlers\HandlerInterface::class);
         $handler->method('shouldHandle')->willReturn(true);
-        $handler->expects(self::exactly(2))->method('handle')->willReturnCallback(
+        $handler->expects($this->exactly(2))->method('handle')->willReturnCallback(
             static function (\Tochka\OpenRpc\Descriptors\Type\SingularTypeInfo $info, Schema $schema, TypeDescriptor $descriptor): Schema {
                 $schema->type = ['array'];
                 $schema->items = $descriptor->describeFromPHPDoc($info->phpDocType->getTypes()[0], new Schema());
@@ -178,7 +181,7 @@ final class TypeDescriptorTest extends TestCase
         }
     }
 
-    /** Finite nested collections are not mistaken for recursive inline DTOs. */
+    /** Nested generic collections have distinct reusable array definitions. */
     public function testNestedGenericCollections(): void
     {
         $descriptor = new TypeDescriptor(new \Tochka\OpenRpc\Descriptors\Type\Handlers\CollectionHandler());
@@ -192,10 +195,13 @@ final class TypeDescriptorTest extends TestCase
             $inner,
         ]);
         $schema = $descriptor->describeFromPHPDoc($outer, new Schema());
-        self::assertSame(['array'], $schema->type);
-        self::assertSame(['array'], $schema->items->type);
-        self::assertSame(['string'], $schema->items->items->type);
-        self::assertSame([], $descriptor->getSchemas());
+        self::assertStringStartsWith('#/components/schemas/Illuminate.Support.Collection.', $schema->ref);
+        $outerSchema = $descriptor->resolveSchema($schema);
+        self::assertSame(['array'], $outerSchema->type);
+        $innerSchema = $descriptor->resolveSchema($outerSchema->items);
+        self::assertSame(['array'], $innerSchema->type);
+        self::assertSame(['string'], $innerSchema->items->type);
+        self::assertCount(2, $descriptor->getSchemas());
     }
 
     /** Property references escape JSON Pointer segments and leave inline schemas intact. */

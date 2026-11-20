@@ -8,7 +8,7 @@ use Tochka\OpenRpc\Attributes\Optional;
 class OptionalDto
 {
     #[Optional]
-    public mixed $mixed;
+    public mixed $mixed = null;
 
     #[Optional]
     public $untyped;
@@ -57,9 +57,9 @@ class OptionalDto
     public ?bool $enabled = false;
 
     public function __construct(
-        #[Optional]
-        public readonly ?int $count,
         public readonly ?int $requiredCount,
+        #[Optional]
+        public readonly ?int $count = null,
         #[Optional]
         public readonly ?string $label = null,
         #[Optional]

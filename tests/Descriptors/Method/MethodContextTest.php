@@ -55,7 +55,7 @@ final class MethodContextTest extends TestCase
         self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.ResponseDto', $json['result']['schema']['allOf'][0]['$ref']);
     }
 
-    /** Inline and nullable request roots both expose their DTO properties. */
+    /** Regular and nullable request roots both expose their DTO properties. */
     public function testInlineAndNullableRequestObjects(): void
     {
         foreach (['inline', 'nullable'] as $method) {
@@ -69,16 +69,12 @@ final class MethodContextTest extends TestCase
             self::assertContains('data', array_column($params, 'name'));
             $json = json_decode(json_encode($params, JSON_THROW_ON_ERROR), true);
             $data = array_column($json, null, 'name')['data']['schema'];
-            if ($method === 'nullable') {
-                self::assertSame(['$ref' => '#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.ReferencedRequest/properties/data'], $data);
-            } else {
-                self::assertArrayNotHasKey('$ref', $data);
-                self::assertSame('integer', $data['anyOf'][0]['properties']['value']['type']);
-            }
+            $class = $method === 'nullable' ? 'ReferencedRequest' : 'PlainRequest';
+            self::assertSame(['$ref' => '#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.' . $class . '/properties/data'], $data);
         }
     }
 
-    /** Optional applies to flattened parameters and result DTOs in both schema modes. */
+    /** Optional applies to flattened parameters and result DTOs for both DTO classes. */
     public function testOptionalRequestAndResultProperties(): void
     {
         foreach (['optional', 'optionalReference'] as $method) {
@@ -102,20 +98,13 @@ final class MethodContextTest extends TestCase
             foreach (['mixed', 'untyped', 'documentedMixed', 'mixedDefault', 'promotedMixed'] as $name) {
                 self::assertFalse($params[$name]->required);
                 self::assertSame('{}', json_encode($result->properties[$name], JSON_THROW_ON_ERROR));
-                if ($method === 'optionalReference') {
-                    self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.ReferencedOptionalDto/properties/' . $name, $params[$name]->schema->ref);
-                } else {
-                    self::assertSame('{}', json_encode($params[$name]->schema, JSON_THROW_ON_ERROR));
-                }
+                $class = $method === 'optionalReference' ? 'ReferencedOptionalDto' : 'OptionalDto';
+                self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.' . $class . '/properties/' . $name, $params[$name]->schema->ref);
             }
-            if ($method === 'optionalReference') {
-                self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.ReferencedOptionalDto/properties/note', $params['note']->schema->ref);
-            } else {
-                self::assertSame(['string'], $params['note']->schema->type);
-            }
+            self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.' . $class . '/properties/note', $params['note']->schema->ref);
         }
     }
-    /** Missing descriptions stay absent for inline and referenced request properties. */
+    /** Missing descriptions stay absent for both request DTO classes. */
     public function testMissingDescriptionsAreOmitted(): void
     {
         foreach (['optional', 'optionalReference'] as $method) {
