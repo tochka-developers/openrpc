@@ -53,7 +53,6 @@ class OpenRpcGenerator implements OpenRpcHandlerInterface
      */
     public function handle(): array
     {
-        $this->typeDescriptor->reset();
         $openRpc = new OpenRpc(self::OPEN_RPC_VERSION, $this->openRpcConfig->info);
         $openRpc->servers[] = $this->openRpcConfig->server;
         $openRpc = $this->routesDescribe($openRpc, $this->router);

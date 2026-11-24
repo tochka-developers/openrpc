@@ -37,17 +37,6 @@ class TypeDescriptor
     /** @var array<string, ContentDescriptor> */
     protected array $contentDescriptors = [];
 
-    public function describeProperty(\ReflectionProperty $property, ?Type $phpDocType): Schema
-    {
-        return $this->describe($property->getType(), new Schema(), $phpDocType);
-    }
-
-    public function reset(): void
-    {
-        $this->schemas = [];
-        $this->contentDescriptors = [];
-    }
-
     /**
      * @return array<string, Schema>
      */

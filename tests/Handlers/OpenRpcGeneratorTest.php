@@ -23,8 +23,8 @@ use Tochka\OpenRpc\Support\OpenRpcConfig;
 #[CoversClass(OpenRpcGenerator::class)]
 final class OpenRpcGeneratorTest extends TestCase
 {
-    /** Documents contain resolvable references and never retain prior components. */
-    public function testDocumentReferencesAndIsolation(): void
+    /** Documents contain resolvable references and reuse shared components. */
+    public function testDocumentReferences(): void
     {
         $container = new Container();
         $container->instance('app', $container);
@@ -35,7 +35,7 @@ final class OpenRpcGeneratorTest extends TestCase
             $secondRoute = new Route('lead_verify_again', Controller::class, 'verify');
             $secondRoute->addParam(new RouteParam('request', PropType::RequestObject, [], false));
             $router = $this->createMock(Router::class);
-            $router->method('getAll')->willReturnOnConsecutiveCalls([$route, $secondRoute], []);
+            $router->method('getAll')->willReturn([$route, $secondRoute]);
             $config = new OpenRpcConfig(
                 [MethodPipe::class, ParameterPipe::class, ResultPipe::class],
                 [ObjectHandler::class],
@@ -71,7 +71,6 @@ final class OpenRpcGeneratorTest extends TestCase
             self::assertNull($properties['data']['default']);
             self::assertSame('null', $properties['data']['anyOf'][1]['type']);
             $this->assertReferencesResolve($document, $document);
-            self::assertArrayNotHasKey('components', $generator->handle());
         } finally {
             Facade::clearResolvedInstances();
             Facade::setFacadeApplication(null);

@@ -10,16 +10,6 @@ class Controller
         throw new \LogicException('Not invoked.');
     }
 
-    public function optional(OptionalDto $request): OptionalDto
-    {
-        throw new \LogicException('Not invoked.');
-    }
-
-    public function optionalReference(ReferencedOptionalDto $request): ReferencedOptionalDto
-    {
-        throw new \LogicException('Not invoked.');
-    }
-
     public function inline(PlainRequest $request): PlainData
     {
         throw new \LogicException('Not invoked.');

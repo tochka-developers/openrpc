@@ -74,7 +74,7 @@ final class TypeDescriptorTest extends TestCase
     public function testMixedAndReferenceCycles(): void
     {
         foreach ([MixedA::class, MixedB::class, ReferenceCycle::class] as $class) {
-            $this->descriptor->reset();
+            $this->descriptor = new TypeDescriptor(new ObjectHandler());
             $this->describe($class);
             self::assertCount($class === ReferenceCycle::class ? 1 : 2, $this->descriptor->getSchemas());
             self::assertNotFalse(json_encode($this->descriptor->getSchemas(), JSON_THROW_ON_ERROR));
@@ -85,7 +85,7 @@ final class TypeDescriptorTest extends TestCase
     public function testCyclesWithoutAttributes(): void
     {
         foreach ([InlineCycle::class, InlineA::class, BrokenReference::class] as $class) {
-            $this->descriptor->reset();
+            $this->descriptor = new TypeDescriptor(new ObjectHandler());
             $schema = $this->describe($class);
             self::assertSame('object', $schema['type']);
             self::assertCount($class === InlineCycle::class ? 1 : 2, $this->descriptor->getSchemas());
@@ -109,13 +109,17 @@ final class TypeDescriptorTest extends TestCase
         self::assertSame([], $schema['properties']['emptyExamples']['examples']);
     }
 
-    /** Full class keys avoid collisions and inherited DTOs have their own definitions. */
-    public function testKeysInheritanceAndReset(): void
+    /** Full class keys avoid collisions between DTOs with matching short names. */
+    public function testFullClassKeysAvoidCollisions(): void
     {
         $this->describe(SharedData::class);
         $this->describe(Fixtures\Other\SharedData::class);
         self::assertCount(2, $this->descriptor->getSchemas());
-        $this->descriptor->reset();
+    }
+
+    /** Inherited DTOs have their own definitions. */
+    public function testInheritedDtoDefinitions(): void
+    {
         $schema = $this->describe(ChildRequest::class);
         self::assertArrayNotHasKey('$ref', $schema);
         self::assertSame(['Tochka.OpenRpc.Tests.Fixtures.ChildRequest', 'Tochka.OpenRpc.Tests.Fixtures.SharedData'], array_keys($this->descriptor->getSchemas()));
@@ -131,12 +135,25 @@ final class TypeDescriptorTest extends TestCase
     /** Failed definitions preserve completed components and discard partial ones. */
     public function testRollbackPreservesExistingSchemas(): void
     {
+        $handler = $this->createMock(\Tochka\OpenRpc\Descriptors\Type\Handlers\HandlerInterface::class);
+        $handler->method('shouldHandle')->willReturnCallback(
+            static fn (\Tochka\OpenRpc\Descriptors\Type\SingularTypeInfo $info): bool => ltrim($info->className, '\\') === PlainRequest::class,
+        );
+        $handler->method('handle')->willReturnCallback(
+            static function (\Tochka\OpenRpc\Descriptors\Type\SingularTypeInfo $info, Schema $schema, TypeDescriptor $descriptor): Schema {
+                $descriptor->describeFromPHPDoc(new Object_(new Fqsen('\\' . Fixtures\PlainData::class)), new Schema());
+
+                throw new \RuntimeException('Test failure');
+            },
+        );
+        $this->descriptor = new TypeDescriptor($handler, new ObjectHandler());
         $this->describe(SharedData::class);
         $before = json_encode($this->descriptor->getSchemas(), JSON_THROW_ON_ERROR);
         try {
-            $this->describe(Fixtures\NullOnlyOptionalDto::class);
-            self::fail('Expected invalid Optional exception.');
-        } catch (\RuntimeException) {
+            $this->describe(PlainRequest::class);
+            self::fail('Expected handler exception.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Test failure', $exception->getMessage());
             self::assertSame($before, json_encode($this->descriptor->getSchemas(), JSON_THROW_ON_ERROR));
         }
     }
@@ -222,7 +239,7 @@ final class TypeDescriptorTest extends TestCase
         self::assertSame($property, $this->descriptor->getPropertySchema($inline, 'path/~value'));
     }
 
-    /** Reusable parameters are isolated by full DTO identity and cleared between documents. */
+    /** Reusable parameters are isolated by full DTO identity. */
     public function testContentDescriptorRegistry(): void
     {
         $this->describe(SharedData::class);
@@ -240,7 +257,5 @@ final class TypeDescriptorTest extends TestCase
         self::assertNotSame($reference->ref, $other->ref);
         self::assertCount(2, $this->descriptor->getContentDescriptors());
         self::assertSame($first, $this->descriptor->referenceParameter(new Schema(), $first));
-        $this->descriptor->reset();
-        self::assertSame([], $this->descriptor->getContentDescriptors());
     }
 }

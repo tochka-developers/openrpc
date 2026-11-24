@@ -74,57 +74,29 @@ final class MethodContextTest extends TestCase
         }
     }
 
-    /** Optional applies to flattened parameters and result DTOs for both DTO classes. */
-    public function testOptionalRequestAndResultProperties(): void
-    {
-        foreach (['optional', 'optionalReference'] as $method) {
-            $route = new Route('test_' . $method, Controller::class, $method);
-            $route->addParam(new RouteParam('request', PropType::RequestObject, [], false));
-            $pipeline = (new Pipeline(new Container()))->through([new ParameterPipe(), new ResultPipe()]);
-            $descriptor = new TypeDescriptor(new ObjectHandler());
-            $context = new MethodContext($pipeline, $route, $descriptor);
-            $context->describeParameters();
-            $context->describeResult();
-            $params = array_column($this->resolveParameters($context->getResult()->params), null, 'name');
-            foreach (['note', 'count', 'nested', 'shared', 'enabled', 'values', 'union', 'label'] as $name) {
-                self::assertFalse($params[$name]->required);
-            }
-            self::assertTrue($params['requiredNullable']->required);
-            self::assertTrue($params['requiredCount']->required);
-            $result = $descriptor->resolveSchema($context->getResult()->result->schema);
-            self::assertSame(['requiredNullable', 'requiredCount'], $result->required);
-            self::assertSame(['string'], $result->properties['note']->type);
-            self::assertArrayNotHasKey('default', get_object_vars($result->properties['note']));
-            foreach (['mixed', 'untyped', 'documentedMixed', 'mixedDefault', 'promotedMixed'] as $name) {
-                self::assertFalse($params[$name]->required);
-                self::assertSame('{}', json_encode($result->properties[$name], JSON_THROW_ON_ERROR));
-                $class = $method === 'optionalReference' ? 'ReferencedOptionalDto' : 'OptionalDto';
-                self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.' . $class . '/properties/' . $name, $params[$name]->schema->ref);
-            }
-            self::assertSame('#/components/schemas/Tochka.OpenRpc.Tests.Fixtures.' . $class . '/properties/note', $params['note']->schema->ref);
-        }
-    }
     /** Missing descriptions stay absent for both request DTO classes. */
     public function testMissingDescriptionsAreOmitted(): void
     {
-        foreach (['optional', 'optionalReference'] as $method) {
+        foreach (['inline', 'nullable'] as $method) {
             $route = new Route('test_' . $method, Controller::class, $method);
             $route->addParam(new RouteParam('request', PropType::RequestObject, [], false));
             $descriptor = new TypeDescriptor(new ObjectHandler());
             $context = new MethodContext((new Pipeline(new Container()))->through([new ParameterPipe()]), $route, $descriptor);
             $context->describeParameters();
             $params = array_column(json_decode(json_encode($this->resolveParameters($context->getResult()->params), JSON_THROW_ON_ERROR), true), null, 'name');
-            self::assertArrayNotHasKey('description', $params['note']);
-            self::assertArrayNotHasKey('description', $params['enabled']);
-            self::assertSame('Enabled', $params['enabled']['summary']);
-            self::assertSame('Optional shared description.', $params['shared']['description']);
+            self::assertArrayNotHasKey('description', $params['first']);
+            self::assertArrayNotHasKey('description', $params['second']);
+            self::assertSame('', $params['first']['summary']);
+            if ($method === 'nullable') {
+                self::assertSame('Data description.', $params['data']['description']);
+            }
         }
     }
 
     /** Request parameters are stably grouped by requiredness, including inherited properties. */
     public function testRequiredParametersPrecedeOptionalParameters(): void
     {
-        foreach (['verify', 'optional', 'optionalReference'] as $method) {
+        foreach (['verify', 'inline', 'nullable'] as $method) {
             $route = new Route('test_' . $method, Controller::class, $method);
             $route->addParam(new RouteParam('request', PropType::RequestObject, [], false));
             $descriptor = new TypeDescriptor(new ObjectHandler());

@@ -6,7 +6,6 @@ use phpDocumentor\Reflection\DocBlock\Tags\Var_;
 use phpDocumentor\Reflection\DocBlockFactory;
 use phpDocumentor\Reflection\Types\ContextFactory;
 use Tochka\OpenRpc\Attributes\Examples;
-use Tochka\OpenRpc\Attributes\Optional;
 use Tochka\OpenRpc\Descriptors\Type\SingularTypeInfo;
 use Tochka\OpenRpc\Descriptors\Type\TypeDescriptor;
 use Tochka\OpenRpc\DTO\Schema;
@@ -45,11 +44,7 @@ class ObjectHandler implements HandlerInterface
                 $phpDocType = $tag?->getType();
             }
 
-            $result = $typeDescriptor->describeProperty($prop, $phpDocType);
-            $isOptional = $prop->getAttributes(Optional::class) !== [];
-            if ($isOptional) {
-                $result = $this->withoutNull($result);
-            }
+            $result = $typeDescriptor->describe($prop->getType(), new Schema(), $phpDocType);
 
             $summary = $docBlock?->getSummary() ?: $tag?->getDescription()?->__toString();
             if ($summary) {
@@ -70,15 +65,9 @@ class ObjectHandler implements HandlerInterface
                     }
                 }
             }
-            if ($isOptional && !$hasDefault) {
-                throw new \RuntimeException(
-                    'Свойство ' . $prop->getDeclaringClass()->getName() . '::$' . $prop->getName()
-                    . ' с #[Optional] должно иметь значение по умолчанию.'
-                );
-            }
-            if ($hasDefault && (!$isOptional || $default !== null)) {
+            if ($hasDefault) {
                 $result->default = $default;
-            } elseif (!$hasDefault && !$isOptional) {
+            } else {
                 $schema->required[] = $prop->getName();
             }
             $examples = $prop->getAttributes(Examples::class)[0] ?? null;
@@ -90,38 +79,5 @@ class ObjectHandler implements HandlerInterface
         }
 
         return $schema;
-    }
-
-    protected function withoutNull(Schema $schema): Schema
-    {
-        $result = clone $schema;
-        $result->type = array_values(array_diff($result->type, ['null', 'void']));
-        if ($result->type === []) {
-            throw new \RuntimeException('Свойство с #[Optional] должно иметь тип, отличный от null.');
-        }
-        if (isset($result->anyOf)) {
-            $result->anyOf = [];
-            foreach ($schema->anyOf as $branch) {
-                if (array_diff($branch->type, ['null', 'void']) !== []) {
-                    $result->anyOf[] = $this->withoutNull($branch);
-                }
-            }
-            if ($result->anyOf === []) {
-                throw new \RuntimeException('Свойство с #[Optional] должно иметь тип, отличный от null.');
-            }
-            if (count($result->anyOf) === 1) {
-                $single = clone $result->anyOf[0];
-                foreach (get_object_vars($result) as $name => $value) {
-                    if ($name === 'anyOf' || ($name === 'type' && $value === ['mixed']) || ($name === 'required' && $value === [])) {
-                        continue;
-                    }
-                    $single->{$name} = $value;
-                }
-
-                return $single;
-            }
-        }
-
-        return $result;
     }
 }
