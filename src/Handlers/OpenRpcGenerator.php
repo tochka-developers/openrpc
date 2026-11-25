@@ -12,6 +12,7 @@ use Tochka\OpenRpc\Descriptors\Method\MethodContext;
 use Tochka\OpenRpc\Descriptors\Method\Pipes\PipeInterface;
 use Tochka\OpenRpc\Descriptors\Type\Handlers\HandlerInterface;
 use Tochka\OpenRpc\Descriptors\Type\TypeDescriptor;
+use Tochka\OpenRpc\DTO\Components;
 use Tochka\OpenRpc\DTO\OpenRpc;
 use Tochka\OpenRpc\Support\OpenRpcConfig;
 
@@ -55,6 +56,12 @@ class OpenRpcGenerator implements OpenRpcHandlerInterface
         $openRpc = new OpenRpc(self::OPEN_RPC_VERSION, $this->openRpcConfig->info);
         $openRpc->servers[] = $this->openRpcConfig->server;
         $openRpc = $this->routesDescribe($openRpc, $this->router);
+
+        if ($this->typeDescriptor->getSchemas() !== [] || $this->typeDescriptor->getContentDescriptors() !== []) {
+            $openRpc->components = new Components();
+            $openRpc->components->schemas = $this->typeDescriptor->getSchemas();
+            $openRpc->components->contentDescriptors = $this->typeDescriptor->getContentDescriptors();
+        }
         
         return (array)$openRpc;
     }

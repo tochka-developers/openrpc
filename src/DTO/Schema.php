@@ -10,6 +10,7 @@ final class Schema implements \JsonSerializable
     public ?string $comment;
     public ?string $title;
     public ?string $summary;
+    public ?string $description;
     public mixed $default;
     /** @var array<string> */
     public array $required = [];
@@ -22,13 +23,19 @@ final class Schema implements \JsonSerializable
     public array $anyOf;
     public string $format;
     public self $items;
-    /** @var array<string> */
+    /** @var array<mixed> */
     public array $examples;
     public array $oneOf;
+    /** @var array<self> */
+    public array $allOf;
     
     public function jsonSerialize(): object
     {
         $result = (array)$this;
+        if (isset($this->ref)) {
+            $result['$ref'] = $this->ref;
+            unset($result['ref']);
+        }
         $result['type'] = array_values(array_unique($result['type']));
         $result['type'] = self::convertType($result['type']);
         // если больше одно элемента, и там есть mixed, надо его удалить
@@ -56,6 +63,15 @@ final class Schema implements \JsonSerializable
             unset($result['required']);
         }
         
+        if (isset($result['properties'])) {
+            $result['properties'] = (object)$result['properties'];
+        }
+        if (isset($result['$ref']) && count($result) > 1) {
+            $reference = ['$ref' => $result['$ref']];
+            unset($result['$ref']);
+            $result['allOf'] = [$reference, ...($result['allOf'] ?? [])];
+        }
+
         return (object)$result;
     }
     
